@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        platform: [linux-x64, linux-arm64, macos, windows]
+        platform: [linux-x64, linux-arm64, macos, windows, linux-x64-headless]
         # Pushes test the stable release; nightly and manual runs add the dev channel.
         channel: ${{ fromJSON(github.event_name == 'push' && '["stable"]' || inputs.channel == 'stable' && '["stable"]' || inputs.channel == 'dev' && '["dev"]' || '["stable", "dev"]') }}
         include:
@@ -52,18 +52,30 @@ jobs:
             os: ubuntu-24.04
             runner_variable: BN_RUNNER_LINUX_X64
             secret_suffix: LINUX_X64
+            license_secret: BN_LICENSE_B64
+          # A headless serial downloads the current Linux x86_64 build of the channel, and that
+          # build only accepts the headless license, which has no Binary Similarity. This job
+          # tracks new builds without URL upkeep; the similarity tests run on the other jobs.
+          - platform: linux-x64-headless
+            os: ubuntu-24.04
+            runner_variable: BN_RUNNER_LINUX_X64
+            secret_suffix: NONE
+            license_secret: BN_HEADLESS_LICENSE_B64
           - platform: linux-arm64
             os: ubuntu-24.04-arm
             runner_variable: BN_RUNNER_LINUX_ARM64
             secret_suffix: LINUX_ARM64
+            license_secret: BN_LICENSE_B64
           - platform: macos
             os: macos-15
             runner_variable: BN_RUNNER_MACOS
             secret_suffix: MACOS
+            license_secret: BN_LICENSE_B64
           - platform: windows
             os: windows-2025
             runner_variable: BN_RUNNER_WINDOWS
             secret_suffix: WINDOWS
+            license_secret: BN_LICENSE_B64
 
     steps:
       # Secrets cannot appear in `if:`; only these booleans leave this step.
@@ -71,18 +83,16 @@ jobs:
         id: config
         shell: bash
         env:
-          HAS_LICENSE: ${{ secrets.BN_LICENSE_B64 != '' }}
+          HAS_LICENSE: ${{ secrets[matrix.license_secret] != '' }}
           HAS_SERIAL: ${{ secrets.BN_SERIAL != '' }}
           HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
           PLATFORM: ${{ matrix.platform }}
+          LICENSE_SECRET: ${{ matrix.license_secret }}
         run: |
-          # A headless serial downloads Linux x86_64 only, but always the current build of the
-          # channel, so it beats a fixed URL there. Tests still run under the Ultimate license:
-          # a headless license has no Binary Similarity.
           if [[ "$HAS_LICENSE" != true ]]; then
-            method=none reason="BN_LICENSE_B64 is not set"
-          elif [[ "$PLATFORM" == linux-x64 && "$HAS_SERIAL" == true ]]; then
-            method=serial
+            method=none reason="$LICENSE_SECRET is not set"
+          elif [[ "$PLATFORM" == linux-x64-headless ]]; then
+            if [[ "$HAS_SERIAL" == true ]]; then method=serial; else method=none reason="BN_SERIAL is not set"; fi
           elif [[ "$HAS_URL" == true && "$PLATFORM" == linux-* ]]; then
             method=url
           elif [[ "$HAS_URL" == true ]]; then
@@ -180,7 +190,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         shell: python
         env:
-          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
         run: |
           import base64, json, os, sys
           entries = json.loads(base64.b64decode(os.environ["BN_LICENSE_B64"]))
@@ -196,7 +206,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         env:
           MCRIT_TEST_REAL_BINARYNINJA: "1"
-          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
         run: python -m pytest tests -p no:cacheprovider --tb=short
 
       # Self-hosted runners keep the user site-packages between jobs.
