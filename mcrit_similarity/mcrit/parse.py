@@ -51,7 +51,7 @@ def _as_flags(value: Any) -> int:
         return IS_PICHASH_FLAG if value else 0
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
@@ -76,7 +76,7 @@ def parse_vs_result(
             offset = int(summary["offset"])
             fid = abs(int(summary["fid"]))
             num_bytes = float(summary.get("num_bytes") or 0)
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             continue
         for raw in summary.get("matches") or []:
             if not isinstance(raw, (list, tuple)) or len(raw) < 4:
@@ -89,7 +89,7 @@ def parse_vs_result(
                 matched_fid = int(raw[2])
                 matched_sample = int(raw[1])
                 matched_family = int(raw[0])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 continue
             if score < min_score:
                 continue
@@ -128,7 +128,7 @@ def decode_offset(value: Any, bitness: int = 64) -> int | None:
         return None
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     if number < 0:
         modulus = 1 << bitness
@@ -157,8 +157,12 @@ def target_functions(entries: dict[int, dict[str, Any]]) -> dict[int, tuple[int,
         if not isinstance(entry, dict):
             continue
         offset = decode_offset(entry.get("offset"))
-        if offset is not None:
+        if offset is None:
+            continue
+        try:
             found[int(function_id)] = (offset, corpus_label(entry))
+        except (TypeError, ValueError, OverflowError):
+            continue
     return found
 
 

@@ -35,6 +35,10 @@ class LockedCache:
             self._items.move_to_end(key)
             return self._items[key]
 
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
+
     def set(self, key: Any, value: Any) -> Any:
         with self._lock:
             self._store(key, value)

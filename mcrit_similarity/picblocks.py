@@ -10,9 +10,12 @@ from difflib import SequenceMatcher
 
 # Below this ratio two escaped blocks are unrelated rather than a changed version of each other.
 _CHANGED_RATIO = 0.5
-# Scoring every leftover pair is O(n*m); past this many pairs fall back to positional
-# pairing so a render callback cannot stall the UI thread.
-_FUZZY_PAIR_BUDGET = 20000
+# Scoring one pair costs O(len(a)*len(b)), so the total is the product of the two sides' escaped
+# lengths. Past this many character comparisons, fall back to positional pairing so a render
+# callback cannot stall the UI thread. Two builds of the same mid-size function measure around
+# 10 ms per million here, which puts the cap near a third of a second; text that defeats
+# SequenceMatcher's cheap bounds costs several times that, so this is a ceiling, not a promise.
+_FUZZY_WORK_BUDGET = 40_000_000
 
 
 @dataclass(frozen=True)
@@ -163,7 +166,10 @@ def _changed_pairs(
 ) -> list[tuple[int, int]]:
     if not source_left or not target_left:
         return []
-    if len(source_left) * len(target_left) > _FUZZY_PAIR_BUDGET:
+    work = sum(len(source[i].escaped) for i in source_left) * sum(
+        len(target[j].escaped) for j in target_left
+    )
+    if work > _FUZZY_WORK_BUDGET:
         return [
             (i, j)
             for i, j in zip(source_left, target_left, strict=False)

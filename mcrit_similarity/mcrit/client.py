@@ -6,6 +6,8 @@ one-shot (no shared Session) so overlapping provider visits stay thread-safe.
 
 from __future__ import annotations
 
+import random
+import time
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -19,6 +21,16 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 _MAX_RESPONSE_BYTES = 50 * 1024 * 1024  # 50 MB
 # MCRIT looks up each id separately, so keep single requests bounded.
 _FUNCTION_BATCH = 500
+# A reverse proxy in front of mcritweb answers these while the server restarts or is saturated.
+_RETRY_STATUS = frozenset({502, 503, 504})
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY = 0.5
+_RETRY_MAX_DELAY = 4.0
+
+
+def _retry_delay(attempt: int) -> float:
+    """Exponential backoff with full jitter, so overlapping visits do not retry in lockstep."""
+    return random.uniform(0, min(_RETRY_MAX_DELAY, _RETRY_BASE_DELAY * 2 ** (attempt - 1)))
 
 
 def _normalize_server(url: str) -> str:
@@ -55,15 +67,35 @@ class McritClient:
     def _url(self, path: str) -> str:
         return urljoin(self.mcrit_server, path.lstrip("/"))
 
-    def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+    def _request(self, method: str, path: str, retry: bool = False, **kwargs: Any) -> Any:
+        """Perform one request.
+
+        ``retry`` is for reads only: a retried write could duplicate work, and an attempt
+        re-sends ``kwargs`` verbatim, so a body must be replayable. A timeout is never retried:
+        the caller already waited the configured time and has no say between attempts.
+        """
         kwargs.setdefault("headers", self.headers)
         kwargs.setdefault("timeout", self.timeout)
         kwargs.setdefault("allow_redirects", False)
-        try:
-            response = requests.request(method, self._url(path), **kwargs)
-        except requests.RequestException as exc:
-            raise McritUnavailableError(f"MCRIT request failed: {exc}") from exc
-        return self._handle_response(response)
+        attempts = _RETRY_ATTEMPTS if retry else 1
+        for attempt in range(1, attempts + 1):
+            last = attempt == attempts
+            try:
+                response = requests.request(method, self._url(path), **kwargs)
+            except requests.ConnectionError as exc:
+                # ConnectTimeout is both, and belongs with the timeouts.
+                if last or isinstance(exc, requests.Timeout):
+                    raise McritUnavailableError(f"MCRIT request failed: {exc}") from exc
+                time.sleep(_retry_delay(attempt))
+                continue
+            except requests.RequestException as exc:
+                raise McritUnavailableError(f"MCRIT request failed: {exc}") from exc
+            if not last and response.status_code in _RETRY_STATUS:
+                time.sleep(_retry_delay(attempt))
+                continue
+            return self._handle_response(response)
+        # Unreachable: the last attempt always returns or raises. Here for the type checker.
+        raise McritUnavailableError("MCRIT request failed: retries exhausted")
 
     def _handle_response(self, response: requests.Response) -> Any:
         status = response.status_code
@@ -112,14 +144,14 @@ class McritClient:
         return payload
 
     def get_version(self) -> str | None:
-        data = self._request("GET", "version")
+        data = self._request("GET", "version", retry=True)
         if isinstance(data, dict):
             version = data.get("version")
             return str(version) if version is not None else None
         return None
 
     def get_sample_by_sha256(self, sample_sha256: str) -> dict[str, Any] | None:
-        data = self._request("GET", f"samples/sha256/{sample_sha256}")
+        data = self._request("GET", f"samples/sha256/{sample_sha256}", retry=True)
         return data if isinstance(data, dict) else None
 
     def add_report(self, smda_report: Any) -> dict[str, Any]:
@@ -130,21 +162,23 @@ class McritClient:
         return data
 
     def get_job_data(self, job_id: str) -> dict[str, Any] | None:
-        data = self._request("GET", f"jobs/{job_id}")
+        data = self._request("GET", f"jobs/{job_id}", retry=True)
         return data if isinstance(data, dict) else None
 
     def get_result(self, result_id: str, compact: bool = False) -> Any:
         query = "?compact=True" if compact else ""
-        return self._request("GET", f"results/{result_id}{query}")
+        return self._request("GET", f"results/{result_id}{query}", retry=True)
 
     def get_result_for_job(self, job_id: str, compact: bool = False) -> Any:
         query = "?compact=True" if compact else ""
-        return self._request("GET", f"jobs/{job_id}/result{query}")
+        return self._request("GET", f"jobs/{job_id}/result{query}", retry=True)
 
     def get_jobs(self, method: str, filter_text: str) -> list[dict[str, Any]]:
         """Jobs of ``method`` whose MCRIT parameter string (``method(arg, ...)``) contains the text."""
         # MCRIT applies ``filter`` after ``limit``, so no limit is sent.
-        data = self._request("GET", "jobs", params={"method": method, "filter": filter_text})
+        data = self._request(
+            "GET", "jobs", retry=True, params={"method": method, "filter": filter_text}
+        )
         return [job for job in data if isinstance(job, dict)] if isinstance(data, list) else []
 
     def get_functions_by_ids(self, function_ids: list[int]) -> dict[int, dict[str, Any]]:
@@ -153,7 +187,7 @@ class McritClient:
         for start in range(0, len(function_ids), _FUNCTION_BATCH):
             chunk = function_ids[start : start + _FUNCTION_BATCH]
             body = ",".join(str(int(function_id)) for function_id in chunk)
-            data = self._request("POST", "functions", data=body)
+            data = self._request("POST", "functions", retry=True, data=body)
             if not isinstance(data, dict):
                 continue
             for key, value in data.items():

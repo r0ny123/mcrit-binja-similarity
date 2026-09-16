@@ -45,9 +45,9 @@ def is_match_result(payload: Any) -> bool:
 
 
 def job_failed(job: dict[str, Any]) -> bool:
-    if job.get("attempts_left") == 0 and job.get("result") is None:
-        return True
-    return bool(job.get("is_failed") or job.get("failed"))
+    # A spent attempt counter only means failure while the job has not finished: Job.complete()
+    # writes finished_at before result, and that gap must not be read as a failure.
+    return job_state(job) == "failed" and job.get("result") is None
 
 
 def job_terminated(job: dict[str, Any]) -> bool:

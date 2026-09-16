@@ -17,7 +17,8 @@ def clamp_score(value: int) -> int:
 
 
 def similarity_from_minhash(matched_score: float) -> int:
-    if matched_score <= 0:
+    # Written as a positive test so a NaN score (JSON allows it) maps to 0 instead of raising.
+    if not matched_score > 0:
         return 0
     if matched_score >= 100:
         return 255
