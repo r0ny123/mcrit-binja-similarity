@@ -111,7 +111,7 @@ jobs:
       # runner empties at the start and end of every job. Nothing is cached or uploaded.
       - name: Set up Binary Ninja
         if: steps.config.outputs.method != 'none'
-        uses: Vector35/setup-binary-ninja@2eb40222af97699a720a0ea330c75b98ce61c49c # v1-beta
+        uses: Vector35/setup-binary-ninja@c1414a20628fc677da240f19c366f3c8b06d1d68 # main, 2026-02-24 (node20)
         with:
           license: ${{ steps.config.outputs.method == 'serial' && secrets.BN_SERIAL || '' }}
           download-url: ${{ steps.config.outputs.method == 'url' && secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] || '' }}
