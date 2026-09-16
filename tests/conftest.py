@@ -270,6 +270,10 @@ def _terminate(process) -> None:
     process.wait(timeout=30)
 
 
+_SERVER_LOG_TAIL = 40
+_stopped_server_logs: list[tuple[str, str]] = []
+
+
 class LaunchedServer:
     """An MCRIT server, plus its worker when the backend needs one."""
 
@@ -278,8 +282,17 @@ class LaunchedServer:
         self._processes = processes
 
     def stop(self) -> None:
-        for process in reversed(self._processes):
+        processes, self._processes = self._processes, []
+        for process, log_path in reversed(processes):
             _terminate(process)
+            lines = _log_text(log_path).splitlines()[-_SERVER_LOG_TAIL:]
+            _stopped_server_logs.append((f"{log_path.stem} {self.url}", "\n".join(lines)))
+
+
+def pytest_terminal_summary(terminalreporter):
+    for title, text in _stopped_server_logs:
+        terminalreporter.section(f"MCRIT {title}")
+        terminalreporter.write_line(text)
 
 
 def _spawn(folder: Path, role: str, environment: dict) -> tuple:
@@ -321,7 +334,7 @@ def mcrit_server_factory(tmp_path_factory):
             processes.append(_spawn(folder, "worker", env))
         processes.insert(0, _spawn(folder, "server", env))
         server, log_path = processes[0]
-        handle = LaunchedServer("", [process for process, _log in processes])
+        handle = LaunchedServer("", processes)
         started.append(handle)
         handle.url = _await_ready_line(server, log_path, timeout=180)
         _wait_until_serving(server, handle.url, log_path, timeout=60)

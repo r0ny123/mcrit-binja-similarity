@@ -9,7 +9,9 @@ every test that mutates a server otherwise launches one of its own and stops it 
 from __future__ import annotations
 
 import gc
+import runpy
 import socket
+import sys
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -21,7 +23,7 @@ import requests
 from mcrit_similarity import provider as provider_module
 from mcrit_similarity.cache import FUNCTION_OFFSETS, SAMPLES
 from mcrit_similarity.export import export_smda_report
-from tests.conftest import analysed_views
+from tests.conftest import FIXTURES, analysed_views
 
 if not hasattr(bn, "SimilaritySession"):
     pytest.skip("needs the real Binary Ninja API, not the unit-test stub", allow_module_level=True)
@@ -165,6 +167,7 @@ class Matched:
     session: Any
     server: str
     samples_before: int
+    arch: str
 
 
 @pytest.fixture(scope="module", params=["x86_64", "arm64"])
@@ -187,6 +190,7 @@ def matched(request, mcrit_server):
             session=session,
             server=mcrit_server,
             samples_before=before,
+            arch=arch,
         )
         # Drop the session objects while the views are still open, as the headless example does.
         del session, reference_node, target_node, provider
@@ -496,3 +500,28 @@ def test_query_per_node_serves_two_incoming_nodes(x86_views, own_server):
         finally:
             del session, other_node, reference_node, target_node, provider
             gc.collect()
+
+
+def test_the_headless_example_runs_against_the_server(matched, monkeypatch, capsys):
+    """examples/headless_mcrit.py stays in step with the API it demonstrates."""
+    script = FIXTURES.parent.parent / "examples" / "headless_mcrit.py"
+    settings = bn.Settings()
+    previous = settings.get_string("mcrit.server")
+    settings.set_string("mcrit.server", matched.server)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            str(FIXTURES / f"zlib-{matched.arch}-O2"),
+            str(FIXTURES / f"zlib-{matched.arch}-Os"),
+        ],
+    )
+    try:
+        runpy.run_path(str(script), run_name="__main__")
+    except SystemExit as exit_:
+        assert exit_.code in (0, None), exit_.code
+    finally:
+        settings.set_string("mcrit.server", previous)
+    lines = capsys.readouterr().out.splitlines()
+    assert any(line.startswith("_deflate -> _deflate:") for line in lines), lines[-5:]
