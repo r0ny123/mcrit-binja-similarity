@@ -39,6 +39,17 @@ This is a session provider for comparing binaries, not the MCRIT sidebar for bro
 
 4. In Settings (`Ctrl+,` / `Cmd+,`), search for `mcrit` and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT server, or `https://<host>/api/` plus username and API token for mcritweb.
 
+## Set up an MCRIT server
+
+The plugin is only a client. It needs an MCRIT server, which is a separate project. The quickest way is [docker-mcrit](https://github.com/danielplohmann/docker-mcrit), which brings up the server, its worker, the database and mcritweb together:
+
+```bash
+git clone https://github.com/danielplohmann/docker-mcrit && cd docker-mcrit
+docker-compose up
+```
+
+That serves the MCRIT API on port 8000 and mcritweb on port 5000. Point the plugin at `http://127.0.0.1:8000/`, or at `http://127.0.0.1:5000/api/` with a username and API token to go through mcritweb. A server run by someone else works the same way with its URL.
+
 ## Run a session
 
 1. File > New Similarity Session.
