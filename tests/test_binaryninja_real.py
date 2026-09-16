@@ -92,9 +92,13 @@ def test_render_paints_real_ranges_and_keeps_headers_neutral(views):
     source, target = (_function(view, "_deflate") for view in views)
 
     painted: dict[int, list[tuple[int, int, Any]]] = {}
+    # Keyed by id(): keep every renderer alive so a freed one cannot hand its id to the next.
+    renderers: list[Any] = []
     original = bn.similarity.DiffRenderer.add_range_annotation
 
     def record(renderer, annotation):
+        if id(renderer) not in painted:
+            renderers.append(renderer)
         painted.setdefault(id(renderer), []).append(
             (annotation.start, annotation.end, annotation.type)
         )
