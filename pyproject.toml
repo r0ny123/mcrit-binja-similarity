@@ -1,0 +1,51 @@
+[build-system]
+# PEP 639 license expressions need setuptools 77 or newer.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcrit-binja-similarity"
+version = "0.1.0"
+description = "MCRIT provider for Binary Ninja Binary Similarity"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Rony" }]
+dependencies = [
+    "smda==4.8.0",
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "ty"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM"]
+# The tests use getattr/setattr on purpose where ty cannot see the attribute.
+ignore = ["B009", "B010"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["mcrit_similarity", "tests", "__init__.py"]
+exclude = ["examples"]
+
+[tool.ty.analysis]
+replace-imports-with-any = ["binaryninja.**"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

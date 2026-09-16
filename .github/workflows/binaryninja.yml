@@ -1,0 +1,153 @@
+name: Binary Ninja
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "__init__.py"
+      - "plugin.json"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "mcrit_similarity/**"
+      - "tests/**"
+      - ".github/workflows/binaryninja.yml"
+  schedule:
+    # Nightly, so the dev channel is checked as it changes.
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Binary Ninja channel to test
+        type: choice
+        options: [both, stable, dev]
+        default: both
+
+permissions:
+  contents: read
+
+# A named or computer license allows one running instance at a time: runs of this workflow
+# queue behind each other, and the matrix below runs one job at a time.
+concurrency:
+  group: binaryninja-license
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: ${{ matrix.platform }} (${{ matrix.channel }})
+    # Only the default branch uses the license; pull request code never runs with it.
+    if: github.ref == 'refs/heads/main'
+    environment: binaryninja
+    runs-on: ${{ vars[matrix.runner_variable] || matrix.os }}
+    timeout-minutes: 20
+    continue-on-error: ${{ matrix.channel == 'dev' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        platform: [linux-x64, linux-arm64, macos, windows]
+        # Pushes test the stable release; nightly and manual runs add the dev channel.
+        channel: ${{ fromJSON(github.event_name == 'push' && '["stable"]' || inputs.channel == 'stable' && '["stable"]' || inputs.channel == 'dev' && '["dev"]' || '["stable", "dev"]') }}
+        include:
+          - platform: linux-x64
+            os: ubuntu-24.04
+            runner_variable: BN_RUNNER_LINUX_X64
+            secret_suffix: LINUX_X64
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
+            runner_variable: BN_RUNNER_LINUX_ARM64
+            secret_suffix: LINUX_ARM64
+          - platform: macos
+            os: macos-15
+            runner_variable: BN_RUNNER_MACOS
+            secret_suffix: MACOS
+          - platform: windows
+            os: windows-2025
+            runner_variable: BN_RUNNER_WINDOWS
+            secret_suffix: WINDOWS
+
+    steps:
+      # Secrets cannot appear in `if:`; only these booleans leave this step.
+      - name: Check configuration
+        id: config
+        shell: bash
+        env:
+          HAS_LICENSE: ${{ secrets.BN_LICENSE_B64 != '' }}
+          HAS_SERIAL: ${{ secrets.BN_SERIAL != '' }}
+          HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [[ "$HAS_LICENSE" != true ]]; then
+            method=none reason="BN_LICENSE_B64 is not set"
+          elif [[ "$HAS_URL" == true ]]; then
+            method=url
+          elif [[ "$PLATFORM" == linux-x64 && "$HAS_SERIAL" == true ]]; then
+            method=serial
+          else
+            method=none reason="no download for this platform and channel is configured"
+          fi
+          echo "method=$method" >> "$GITHUB_OUTPUT"
+          if [[ "$method" == none ]]; then echo "::notice::Skipping $PLATFORM: $reason"; fi
+
+      - name: Checkout
+        if: steps.config.outputs.method != 'none'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # setup-binary-ninja links the API into this interpreter's user site-packages.
+      - name: Set up Python
+        if: steps.config.outputs.method != 'none'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        if: steps.config.outputs.method != 'none'
+        run: python -m pip install -e ".[dev]"
+
+      # The serial only reaches this pinned action; it downloads into RUNNER_TEMP, which the
+      # runner empties at the start and end of every job. Nothing is cached or uploaded.
+      - name: Set up Binary Ninja
+        if: steps.config.outputs.method != 'none'
+        uses: Vector35/setup-binary-ninja@2eb40222af97699a720a0ea330c75b98ce61c49c # v1-beta
+        with:
+          license: ${{ steps.config.outputs.method == 'serial' && secrets.BN_SERIAL || '' }}
+          download-url: ${{ steps.config.outputs.method == 'url' && secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] || '' }}
+          dev-branch: ${{ matrix.channel == 'dev' }}
+
+      # The secret is base64, so GitHub only redacts that form; register every decoded field too.
+      # A workflow command is one line, so a value with a line break is refused, never printed.
+      - name: Mask license fields
+        if: steps.config.outputs.method != 'none'
+        shell: python
+        env:
+          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+        run: |
+          import base64, json, os, sys
+          entries = json.loads(base64.b64decode(os.environ["BN_LICENSE_B64"]))
+          for entry in entries if isinstance(entries, list) else [entries]:
+              for key, value in entry.items():
+                  if not isinstance(value, str) or not value or key in ("product", "type"):
+                      continue
+                  if "\n" in value or "\r" in value:
+                      sys.exit(f"license field {key!r} spans lines and cannot be masked")
+                  print(f"::add-mask::{value}")
+
+      - name: Pytest (real Binary Ninja)
+        if: steps.config.outputs.method != 'none'
+        env:
+          MCRIT_TEST_REAL_BINARYNINJA: "1"
+          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+        run: python -m pytest tests -p no:cacheprovider --tb=short
+
+      # Self-hosted runners keep the user site-packages between jobs.
+      - name: Unlink Binary Ninja
+        if: always() && steps.config.outputs.method != 'none'
+        shell: python
+        run: |
+          import os, site
+          path = os.path.join(site.getusersitepackages(), "binaryninja.pth")
+          if os.path.exists(path):
+              os.remove(path)

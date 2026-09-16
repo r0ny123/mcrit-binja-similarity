@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+  # Bumps the pins in pyproject.toml and requirements.txt; CI fails until plugin.json matches.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
