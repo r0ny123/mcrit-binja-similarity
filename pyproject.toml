@@ -48,7 +48,7 @@ include = ["mcrit_similarity", "tests", "__init__.py"]
 exclude = ["examples"]
 
 [tool.ty.analysis]
-replace-imports-with-any = ["binaryninja.**"]
+replace-imports-with-any = ["binaryninja.**", "mcrit.**", "waitress"]
 
 [tool.pyright]
 venvPath = "."
