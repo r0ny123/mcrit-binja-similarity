@@ -76,12 +76,12 @@ jobs:
           HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
           PLATFORM: ${{ matrix.platform }}
         run: |
-          # The serial download (Linux only, headless serial) always serves the current build of
-          # the channel, so it beats a fixed URL. Tests still run under the Ultimate license:
+          # A headless serial downloads Linux x86_64 only, but always the current build of the
+          # channel, so it beats a fixed URL there. Tests still run under the Ultimate license:
           # a headless license has no Binary Similarity.
           if [[ "$HAS_LICENSE" != true ]]; then
             method=none reason="BN_LICENSE_B64 is not set"
-          elif [[ "$PLATFORM" == linux-* && "$HAS_SERIAL" == true ]]; then
+          elif [[ "$PLATFORM" == linux-x64 && "$HAS_SERIAL" == true ]]; then
             method=serial
           elif [[ "$HAS_URL" == true && "$PLATFORM" == linux-* ]]; then
             method=url
@@ -121,13 +121,6 @@ jobs:
           license: ${{ steps.config.outputs.method == 'serial' && secrets.BN_SERIAL || '' }}
           download-url: ${{ steps.config.outputs.method == 'url' && secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] || '' }}
           dev-branch: ${{ matrix.channel == 'dev' }}
-
-      - name: Show installation (Linux)
-        if: runner.os == 'Linux' && (steps.config.outputs.method == 'url' || steps.config.outputs.method == 'serial')
-        shell: bash
-        run: |
-          ls -la "$RUNNER_TEMP/binaryninja" | head -40
-          file "$RUNNER_TEMP/binaryninja/libbinaryninjacore.so.1" || true
 
       # The action only unzips, and the macOS and Windows downloads are a DMG and an installer.
       - name: Download Binary Ninja
