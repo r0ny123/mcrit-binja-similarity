@@ -78,17 +78,27 @@ jobs:
             license_secret: BN_LICENSE_B64
 
     steps:
-      # Secrets cannot appear in `if:`; only these booleans leave this step.
+      # Secrets cannot appear in `if:`; only these booleans leave this step. Every secret is
+      # named literally: a computed `secrets[...]` lookup hands the runner the whole context.
       - name: Check configuration
         id: config
         shell: bash
         env:
-          HAS_LICENSE: ${{ secrets[matrix.license_secret] != '' }}
+          HAS_LICENSE: ${{ (matrix.platform == 'linux-x64-headless' && secrets.BN_HEADLESS_LICENSE_B64 || secrets.BN_LICENSE_B64) != '' }}
           HAS_SERIAL: ${{ secrets.BN_SERIAL != '' }}
-          HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
+          URL_LINUX_X64_STABLE: ${{ secrets.BN_DOWNLOAD_URL_LINUX_X64_STABLE != '' }}
+          URL_LINUX_X64_DEV: ${{ secrets.BN_DOWNLOAD_URL_LINUX_X64_DEV != '' }}
+          URL_LINUX_ARM64_STABLE: ${{ secrets.BN_DOWNLOAD_URL_LINUX_ARM64_STABLE != '' }}
+          URL_LINUX_ARM64_DEV: ${{ secrets.BN_DOWNLOAD_URL_LINUX_ARM64_DEV != '' }}
+          URL_MACOS_STABLE: ${{ secrets.BN_DOWNLOAD_URL_MACOS_STABLE != '' }}
+          URL_MACOS_DEV: ${{ secrets.BN_DOWNLOAD_URL_MACOS_DEV != '' }}
+          URL_WINDOWS_STABLE: ${{ secrets.BN_DOWNLOAD_URL_WINDOWS_STABLE != '' }}
+          URL_WINDOWS_DEV: ${{ secrets.BN_DOWNLOAD_URL_WINDOWS_DEV != '' }}
           PLATFORM: ${{ matrix.platform }}
           LICENSE_SECRET: ${{ matrix.license_secret }}
+          URL_NAME: URL_${{ matrix.secret_suffix }}_${{ matrix.channel == 'dev' && 'DEV' || 'STABLE' }}
         run: |
+          HAS_URL="${!URL_NAME:-false}"
           if [[ "$HAS_LICENSE" != true ]]; then
             method=none reason="$LICENSE_SECRET is not set"
           elif [[ "$PLATFORM" == linux-x64-headless ]]; then
@@ -124,21 +134,37 @@ jobs:
 
       # The serial only reaches this pinned action; it downloads into RUNNER_TEMP, which the
       # runner empties at the start and end of every job. Nothing is cached or uploaded.
-      - name: Set up Binary Ninja
-        if: steps.config.outputs.method == 'url' || steps.config.outputs.method == 'serial'
+      - name: Set up Binary Ninja (serial)
+        if: steps.config.outputs.method == 'serial'
         uses: Vector35/setup-binary-ninja@c1414a20628fc677da240f19c366f3c8b06d1d68 # main, 2026-02-24 (node20)
         with:
-          license: ${{ steps.config.outputs.method == 'serial' && secrets.BN_SERIAL || '' }}
-          download-url: ${{ steps.config.outputs.method == 'url' && secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] || '' }}
+          license: ${{ secrets.BN_SERIAL }}
           dev-branch: ${{ matrix.channel == 'dev' }}
 
-      # The action only unzips, and the macOS and Windows downloads are a DMG and an installer.
       - name: Download Binary Ninja
-        if: steps.config.outputs.method == 'installer'
+        if: steps.config.outputs.method == 'url' || steps.config.outputs.method == 'installer'
         shell: bash
         env:
-          DOWNLOAD_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] }}
-        run: curl -fsSL --retry 3 -o "$RUNNER_TEMP/binaryninja-download" "$DOWNLOAD_URL"
+          BN_DOWNLOAD_URL_LINUX_X64_STABLE: ${{ secrets.BN_DOWNLOAD_URL_LINUX_X64_STABLE }}
+          BN_DOWNLOAD_URL_LINUX_X64_DEV: ${{ secrets.BN_DOWNLOAD_URL_LINUX_X64_DEV }}
+          BN_DOWNLOAD_URL_LINUX_ARM64_STABLE: ${{ secrets.BN_DOWNLOAD_URL_LINUX_ARM64_STABLE }}
+          BN_DOWNLOAD_URL_LINUX_ARM64_DEV: ${{ secrets.BN_DOWNLOAD_URL_LINUX_ARM64_DEV }}
+          BN_DOWNLOAD_URL_MACOS_STABLE: ${{ secrets.BN_DOWNLOAD_URL_MACOS_STABLE }}
+          BN_DOWNLOAD_URL_MACOS_DEV: ${{ secrets.BN_DOWNLOAD_URL_MACOS_DEV }}
+          BN_DOWNLOAD_URL_WINDOWS_STABLE: ${{ secrets.BN_DOWNLOAD_URL_WINDOWS_STABLE }}
+          BN_DOWNLOAD_URL_WINDOWS_DEV: ${{ secrets.BN_DOWNLOAD_URL_WINDOWS_DEV }}
+          URL_NAME: BN_DOWNLOAD_URL_${{ matrix.secret_suffix }}_${{ matrix.channel == 'dev' && 'DEV' || 'STABLE' }}
+        run: curl -fsSL --retry 3 -o "$RUNNER_TEMP/binaryninja-download" "${!URL_NAME}"
+
+      # The Linux download is the zip the action unpacks into RUNNER_TEMP.
+      - name: Set up Binary Ninja (Linux)
+        if: steps.config.outputs.method == 'url'
+        shell: bash
+        run: |
+          unzip -q -o "$RUNNER_TEMP/binaryninja-download" -d "$RUNNER_TEMP"
+          site="$(python -m site --user-site)"
+          mkdir -p "$site"
+          echo "$RUNNER_TEMP/binaryninja/python" > "$site/binaryninja.pth"
 
       - name: Set up Binary Ninja (macOS)
         if: steps.config.outputs.method == 'installer' && runner.os == 'macOS'
@@ -190,7 +216,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         shell: python
         env:
-          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
+          BN_LICENSE_B64: ${{ matrix.platform == 'linux-x64-headless' && secrets.BN_HEADLESS_LICENSE_B64 || secrets.BN_LICENSE_B64 }}
         run: |
           import base64, json, os, sys
           entries = json.loads(base64.b64decode(os.environ["BN_LICENSE_B64"]))
@@ -206,7 +232,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         env:
           MCRIT_TEST_REAL_BINARYNINJA: "1"
-          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
+          BN_LICENSE_B64: ${{ matrix.platform == 'linux-x64-headless' && secrets.BN_HEADLESS_LICENSE_B64 || secrets.BN_LICENSE_B64 }}
         run: python -m pytest tests -p no:cacheprovider --tb=short
 
       # The headless license has no Binary Similarity, and linux-x64 runs the end-to-end tests
@@ -221,7 +247,7 @@ jobs:
         env:
           MCRIT_TEST_REAL_BINARYNINJA: "1"
           MCRIT_TEST_E2E: "1"
-          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
+          BN_LICENSE_B64: ${{ matrix.platform == 'linux-x64-headless' && secrets.BN_HEADLESS_LICENSE_B64 || secrets.BN_LICENSE_B64 }}
         run: python -m pytest tests -m e2e -p no:cacheprovider --tb=short
 
       # Self-hosted runners keep the user site-packages between jobs.
@@ -272,7 +298,7 @@ jobs:
         shell: bash
         env:
           HAS_LICENSE: ${{ secrets.BN_LICENSE_B64 != '' }}
-          HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_LINUX_X64_{0}', matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
+          HAS_URL: ${{ (matrix.channel == 'dev' && secrets.BN_DOWNLOAD_URL_LINUX_X64_DEV || secrets.BN_DOWNLOAD_URL_LINUX_X64_STABLE) != '' }}
         run: |
           if [[ "$HAS_LICENSE" == true && "$HAS_URL" == true ]]; then method=url; else method=none; fi
           echo "method=$method" >> "$GITHUB_OUTPUT"
@@ -298,10 +324,15 @@ jobs:
 
       - name: Set up Binary Ninja
         if: steps.config.outputs.method != 'none'
-        uses: Vector35/setup-binary-ninja@c1414a20628fc677da240f19c366f3c8b06d1d68 # main, 2026-02-24 (node20)
-        with:
-          download-url: ${{ secrets[format('BN_DOWNLOAD_URL_LINUX_X64_{0}', matrix.channel == 'dev' && 'DEV' || 'STABLE')] }}
-          dev-branch: ${{ matrix.channel == 'dev' }}
+        shell: bash
+        env:
+          DOWNLOAD_URL: ${{ matrix.channel == 'dev' && secrets.BN_DOWNLOAD_URL_LINUX_X64_DEV || secrets.BN_DOWNLOAD_URL_LINUX_X64_STABLE }}
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/binaryninja-download" "$DOWNLOAD_URL"
+          unzip -q -o "$RUNNER_TEMP/binaryninja-download" -d "$RUNNER_TEMP"
+          site="$(python -m site --user-site)"
+          mkdir -p "$site"
+          echo "$RUNNER_TEMP/binaryninja/python" > "$site/binaryninja.pth"
 
       - name: Mask license fields
         if: steps.config.outputs.method != 'none'
