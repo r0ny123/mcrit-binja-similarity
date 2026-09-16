@@ -215,9 +215,10 @@ def provider_type():
         return McritProviderType()
     from binaryninja.similarity import SimilarityProviderType
 
-    return next(
-        t for t in SimilarityProviderType._registered_types if isinstance(t, McritProviderType)
-    )
+    for registered in SimilarityProviderType._registered_types:
+        if isinstance(registered, McritProviderType):
+            return registered
+    pytest.skip("the MCRIT provider is only registered on Binary Ninja Ultimate")
 
 
 @pytest.fixture(autouse=True)
