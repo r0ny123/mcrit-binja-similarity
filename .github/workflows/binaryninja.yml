@@ -72,22 +72,32 @@ jobs:
         shell: bash
         env:
           HAS_LICENSE: ${{ secrets.BN_LICENSE_B64 != '' }}
+          HAS_HEADLESS_LICENSE: ${{ secrets.BN_HEADLESS_LICENSE_B64 != '' }}
           HAS_SERIAL: ${{ secrets.BN_SERIAL != '' }}
           HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_{0}_{1}', matrix.secret_suffix, matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
           PLATFORM: ${{ matrix.platform }}
         run: |
-          if [[ "$HAS_LICENSE" != true ]]; then
+          # Linux runs under the headless license when there is one; the serial download
+          # (Linux only) always serves the current build of the channel, so it beats a fixed URL.
+          license_secret=BN_LICENSE_B64
+          if [[ "$PLATFORM" == linux-* && "$HAS_HEADLESS_LICENSE" == true ]]; then
+            license_secret=BN_HEADLESS_LICENSE_B64
+          elif [[ "$HAS_LICENSE" != true ]]; then
+            license_secret=""
+          fi
+          if [[ -z "$license_secret" ]]; then
             method=none reason="BN_LICENSE_B64 is not set"
+          elif [[ "$PLATFORM" == linux-* && "$HAS_SERIAL" == true ]]; then
+            method=serial
           elif [[ "$HAS_URL" == true && "$PLATFORM" == linux-* ]]; then
             method=url
           elif [[ "$HAS_URL" == true ]]; then
             method=installer
-          elif [[ "$PLATFORM" == linux-x64 && "$HAS_SERIAL" == true ]]; then
-            method=serial
           else
             method=none reason="no download for this platform and channel is configured"
           fi
           echo "method=$method" >> "$GITHUB_OUTPUT"
+          echo "license_secret=$license_secret" >> "$GITHUB_OUTPUT"
           if [[ "$method" == none ]]; then echo "::notice::Skipping $PLATFORM: $reason"; fi
 
       - name: Checkout
@@ -177,7 +187,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         shell: python
         env:
-          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+          BN_LICENSE_B64: ${{ secrets[steps.config.outputs.license_secret] }}
         run: |
           import base64, json, os, sys
           entries = json.loads(base64.b64decode(os.environ["BN_LICENSE_B64"]))
@@ -193,7 +203,7 @@ jobs:
         if: steps.config.outputs.method != 'none'
         env:
           MCRIT_TEST_REAL_BINARYNINJA: "1"
-          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+          BN_LICENSE_B64: ${{ secrets[steps.config.outputs.license_secret] }}
         run: python -m pytest tests -p no:cacheprovider --tb=short
 
       # Self-hosted runners keep the user site-packages between jobs.
