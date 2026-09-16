@@ -129,6 +129,16 @@ The tests run against a stub of the Binary Ninja API and need no license. To run
 MCRIT_TEST_REAL_BINARYNINJA=1 python -m pytest tests
 ```
 
+The end-to-end tests additionally start a throwaway MCRIT server (in-memory storage, no MongoDB and no worker) on a loopback port and run real sessions over the zlib fixtures against it. They need `pip install -e ".[dev,e2e]"` for the MCRIT package and are opt-in:
+
+```bash
+MCRIT_TEST_REAL_BINARYNINJA=1 MCRIT_TEST_E2E=1 python -m pytest tests -m e2e
+```
+
+Set `MCRIT_E2E_SERVER_URL` to test against a server you run yourself instead; the tests reset it through `POST /respawn`, so never point it at an instance whose data you want to keep.
+
+Set `MCRIT_E2E_STORAGE=mongodb` to run the same tests against MCRIT in its deployed shape instead: each launched server is backed by a MongoDB (`MCRIT_E2E_MONGO_HOST`, `MCRIT_E2E_MONGO_PORT`, `MCRIT_E2E_MONGO_DB`, which gets a per-server suffix) and gets a worker process of its own. `tests/e2e/mcrit_server.py` runs either shape from the command line too.
+
 For `import binaryninja` to resolve in your editor, run Binary Ninja's `scripts/install_api.py` with the virtual environment activated (macOS: `python "/Applications/Binary Ninja.app/Contents/Resources/scripts/install_api.py"`). It picks the environment up from `VIRTUAL_ENV`; without it, the API goes into your user site-packages. `pyproject.toml` already points Pyright at `.venv`.
 
 ## License

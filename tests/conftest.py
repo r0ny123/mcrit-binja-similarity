@@ -1,14 +1,22 @@
 import base64
 import importlib
 import os
+import signal
+import subprocess
 import sys
+import time
 import types
+from contextlib import ExitStack, contextmanager
 from enum import IntEnum
+from pathlib import Path
 
 import pytest
 
 # Set to 1 to run the suite against a real headless Binary Ninja instead of the stub below.
 REAL_BINARYNINJA = os.environ.get("MCRIT_TEST_REAL_BINARYNINJA") == "1"
+# Set to 1 to also run the end-to-end tests, which launch a throwaway MCRIT server.
+RUN_E2E = os.environ.get("MCRIT_TEST_E2E") == "1"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _make_module(name, **attrs):
@@ -195,15 +203,143 @@ def pytest_report_header(config):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "binaryninja: needs a real headless Binary Ninja")
+    config.addinivalue_line("markers", "e2e: needs a launched MCRIT server as well")
 
 
 def pytest_collection_modifyitems(config, items):
-    if REAL_BINARYNINJA:
-        return
-    skip = pytest.mark.skip(reason="set MCRIT_TEST_REAL_BINARYNINJA=1 to use a real Binary Ninja")
+    skip_bn = pytest.mark.skip(
+        reason="set MCRIT_TEST_REAL_BINARYNINJA=1 to use a real Binary Ninja"
+    )
+    skip_e2e = pytest.mark.skip(reason="set MCRIT_TEST_E2E=1 to run the end-to-end tests")
     for item in items:
-        if "binaryninja" in item.keywords:
-            item.add_marker(skip)
+        if not REAL_BINARYNINJA and "binaryninja" in item.keywords:
+            item.add_marker(skip_bn)
+        if not RUN_E2E and "e2e" in item.keywords:
+            item.add_marker(skip_e2e)
+
+
+def _log_text(log_path: Path) -> str:
+    # A Windows runner defaults to cp1252, and MCRIT logs are UTF-8.
+    return log_path.read_text(encoding="utf-8", errors="replace")
+
+
+def _await_ready_line(process, log_path: Path, timeout: float) -> str:
+    """The URL the launcher prints once waitress has bound, so no port is reserved twice."""
+    prefix = "MCRIT_E2E_READY "  # READY_PREFIX in tests/e2e/mcrit_server.py
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for line in _log_text(log_path).splitlines():
+            if line.startswith(prefix):
+                return line[len(prefix) :].strip()
+        if process.poll() is not None:
+            raise RuntimeError(f"MCRIT exited with {process.returncode}:\n{_log_text(log_path)}")
+        time.sleep(0.25)
+    raise RuntimeError(f"MCRIT never reported a port:\n{_log_text(log_path)}")
+
+
+def _wait_until_serving(process, url: str, log_path: Path, timeout: float) -> None:
+    import requests
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"MCRIT exited with {process.returncode}:\n{_log_text(log_path)}")
+        try:
+            if requests.get(f"{url}status", timeout=5).status_code == 200:
+                return
+        except requests.RequestException:
+            pass
+        time.sleep(0.25)
+    raise RuntimeError(f"MCRIT did not answer {url}status:\n{_log_text(log_path)}")
+
+
+def _terminate(process) -> None:
+    if process.poll() is None:
+        try:
+            if os.name == "nt":
+                # Popen.terminate() is TerminateProcess on Windows, which runs no handler.
+                process.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                process.terminate()
+        except (OSError, ValueError):
+            pass
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+    process.wait(timeout=30)
+
+
+class LaunchedServer:
+    """An MCRIT server, plus its worker when the backend needs one."""
+
+    def __init__(self, url: str, processes: list) -> None:
+        self.url = url
+        self._processes = processes
+
+    def stop(self) -> None:
+        for process in reversed(self._processes):
+            _terminate(process)
+
+
+def _spawn(folder: Path, role: str, environment: dict) -> tuple:
+    script = Path(__file__).parent / "e2e" / "mcrit_server.py"
+    arguments = ["--role", "worker"] if role == "worker" else ["--port", "0"]
+    log_path = folder / f"{role}.log"
+    # CREATE_NEW_PROCESS_GROUP makes the child its own group, so CTRL_BREAK reaches only it.
+    flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    with log_path.open("wb") as log:
+        process = subprocess.Popen(
+            [sys.executable, str(script), *arguments],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            cwd=str(folder),
+            env=environment,
+            creationflags=flags,
+        )
+    return process, log_path
+
+
+@pytest.fixture(scope="session")
+def mcrit_server_factory(tmp_path_factory):
+    """Launch MCRIT servers; each returns a handle with its URL and a stop().
+
+    The backend follows MCRIT_E2E_STORAGE: in memory (the default) one process serves and runs
+    its own jobs, while "mongodb" is MCRIT's deployed shape and needs a worker process too.
+    """
+    started: list[LaunchedServer] = []
+
+    def start(**environment: str) -> LaunchedServer:
+        folder = tmp_path_factory.mktemp("mcrit-server")
+        env = {**os.environ, **environment}
+        processes = []
+        if env.get("MCRIT_E2E_STORAGE", "memory") != "memory":
+            # The tests empty a server through POST /respawn, so no two may share a database.
+            env["MCRIT_E2E_MONGO_DB"] = (
+                f"{env.get('MCRIT_E2E_MONGO_DB', 'mcrit_e2e')}_{len(started)}"
+            )
+            processes.append(_spawn(folder, "worker", env))
+        processes.insert(0, _spawn(folder, "server", env))
+        server, log_path = processes[0]
+        handle = LaunchedServer("", [process for process, _log in processes])
+        started.append(handle)
+        handle.url = _await_ready_line(server, log_path, timeout=180)
+        _wait_until_serving(server, handle.url, log_path, timeout=60)
+        return handle
+
+    try:
+        yield start
+    finally:
+        for handle in started:
+            handle.stop()
+
+
+@pytest.fixture(scope="session")
+def mcrit_server(mcrit_server_factory):
+    external = os.environ.get("MCRIT_E2E_SERVER_URL")
+    if external:
+        return external if external.endswith("/") else external + "/"
+    return mcrit_server_factory().url
 
 
 @pytest.fixture
@@ -301,3 +437,33 @@ def vs_result():
             "samples": [],
         },
     }
+
+
+@contextmanager
+def analysed_views(*names: str):
+    """Open the named binaries from tests/fixtures and finish their analysis."""
+    import binaryninja
+
+    with ExitStack() as stack:
+        opened = [stack.enter_context(binaryninja.load(str(FIXTURES / name))) for name in names]
+        for view in opened:
+            view.update_analysis_and_wait()
+        yield tuple(opened)
+
+
+@pytest.fixture(scope="module", params=["x86_64", "arm64"])
+def views(request):
+    """The -O2 and -Os builds of the same zlib sources for one architecture."""
+    with analysed_views(f"zlib-{request.param}-O2", f"zlib-{request.param}-Os") as opened:
+        yield opened
+
+
+@pytest.fixture
+def instant_retry_backoff(monkeypatch):
+    """Record the client's retry backoff instead of waiting it out; jitter pinned to its bound."""
+    from mcrit_similarity.mcrit import client
+
+    delays: list[float] = []
+    monkeypatch.setattr(client.time, "sleep", delays.append)
+    monkeypatch.setattr(client.random, "uniform", lambda low, high: high)
+    return delays

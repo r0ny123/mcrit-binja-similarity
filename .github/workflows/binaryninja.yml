@@ -38,7 +38,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: binaryninja
     runs-on: ${{ vars[matrix.runner_variable] || matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     continue-on-error: ${{ matrix.channel == 'dev' }}
     strategy:
       fail-fast: false
@@ -208,6 +208,130 @@ jobs:
           MCRIT_TEST_REAL_BINARYNINJA: "1"
           BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
         run: python -m pytest tests -p no:cacheprovider --tb=short
+
+      # The headless license has no Binary Similarity, and linux-x64 runs the end-to-end tests
+      # against MongoDB-backed MCRIT in the job below instead of the in-memory launcher.
+      - name: Install MCRIT server
+        if: steps.config.outputs.method != 'none' && matrix.platform != 'linux-x64-headless' && matrix.platform != 'linux-x64'
+        run: python -m pip install -e ".[dev,e2e]"
+
+      - name: Pytest end-to-end (launched MCRIT server)
+        if: steps.config.outputs.method != 'none' && matrix.platform != 'linux-x64-headless' && matrix.platform != 'linux-x64'
+        timeout-minutes: 15
+        env:
+          MCRIT_TEST_REAL_BINARYNINJA: "1"
+          MCRIT_TEST_E2E: "1"
+          BN_LICENSE_B64: ${{ secrets[matrix.license_secret] }}
+        run: python -m pytest tests -m e2e -p no:cacheprovider --tb=short
+
+      # Self-hosted runners keep the user site-packages between jobs.
+      - name: Unlink Binary Ninja
+        if: always() && steps.config.outputs.method != 'none'
+        shell: python
+        run: |
+          import os, site
+          path = os.path.join(site.getusersitepackages(), "binaryninja.pth")
+          if os.path.exists(path):
+              os.remove(path)
+
+  # linux-x64 runs the same end-to-end tests against MCRIT in its deployed shape: every server
+  # the tests launch is MongoDB-backed and gets a worker process of its own. A service container
+  # is job-wide, so this cannot be a step of the matrix above, which also covers macOS and Windows.
+  e2e-mongodb:
+    name: linux-x64 end-to-end (MongoDB, ${{ matrix.channel }})
+    # One license, one running instance: this job must not overlap the matrix above. !cancelled()
+    # still runs it after a continue-on-error dev failure, but not after a cancelled run.
+    needs: test
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    environment: binaryninja
+    runs-on: ${{ vars.BN_RUNNER_LINUX_X64 || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    continue-on-error: ${{ matrix.channel == 'dev' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        channel: ${{ fromJSON(github.event_name == 'push' && '["stable"]' || inputs.channel == 'stable' && '["stable"]' || inputs.channel == 'dev' && '["dev"]' || '["stable", "dev"]') }}
+
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          # Not the default port: a self-hosted runner may run a MongoDB of its own, and the
+          # tests call POST /respawn, which empties the whole database.
+          - 27018:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check configuration
+        id: config
+        shell: bash
+        env:
+          HAS_LICENSE: ${{ secrets.BN_LICENSE_B64 != '' }}
+          HAS_URL: ${{ secrets[format('BN_DOWNLOAD_URL_LINUX_X64_{0}', matrix.channel == 'dev' && 'DEV' || 'STABLE')] != '' }}
+        run: |
+          if [[ "$HAS_LICENSE" == true && "$HAS_URL" == true ]]; then method=url; else method=none; fi
+          echo "method=$method" >> "$GITHUB_OUTPUT"
+          if [[ "$method" == none ]]; then echo "::notice::Skipping: no license or download URL"; fi
+
+      - name: Checkout
+        if: steps.config.outputs.method != 'none'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        if: steps.config.outputs.method != 'none'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        if: steps.config.outputs.method != 'none'
+        run: python -m pip install -e ".[dev,e2e]"
+
+      - name: Set up Binary Ninja
+        if: steps.config.outputs.method != 'none'
+        uses: Vector35/setup-binary-ninja@c1414a20628fc677da240f19c366f3c8b06d1d68 # main, 2026-02-24 (node20)
+        with:
+          download-url: ${{ secrets[format('BN_DOWNLOAD_URL_LINUX_X64_{0}', matrix.channel == 'dev' && 'DEV' || 'STABLE')] }}
+          dev-branch: ${{ matrix.channel == 'dev' }}
+
+      - name: Mask license fields
+        if: steps.config.outputs.method != 'none'
+        shell: python
+        env:
+          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+        run: |
+          import base64, json, os, sys
+          entries = json.loads(base64.b64decode(os.environ["BN_LICENSE_B64"]))
+          for entry in entries if isinstance(entries, list) else [entries]:
+              for key, value in entry.items():
+                  if not isinstance(value, str) or not value or key in ("product", "type"):
+                      continue
+                  if "\n" in value or "\r" in value:
+                      sys.exit(f"license field {key!r} spans lines and cannot be masked")
+                  print(f"::add-mask::{value}")
+
+      # MCRIT reads its MongoDB settings from dataclass defaults, so the launcher sets them
+      # from these; the test fixtures start and stop every server and worker themselves.
+      - name: Pytest end-to-end (MongoDB-backed MCRIT)
+        if: steps.config.outputs.method != 'none'
+        timeout-minutes: 20
+        env:
+          MCRIT_TEST_REAL_BINARYNINJA: "1"
+          MCRIT_TEST_E2E: "1"
+          MCRIT_E2E_STORAGE: mongodb
+          MCRIT_E2E_MONGO_PORT: "27018"
+          MCRIT_E2E_MONGO_DB: mcrit_e2e_${{ github.run_id }}
+          BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
+        run: python -m pytest tests -m e2e -p no:cacheprovider --tb=short
 
       # Self-hosted runners keep the user site-packages between jobs.
       - name: Unlink Binary Ninja

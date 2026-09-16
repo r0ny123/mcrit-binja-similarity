@@ -16,18 +16,6 @@ ultimate = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module", params=["x86_64", "arm64"])
-def views(request):
-    """The -O2 and -Os builds of the same zlib sources for one architecture."""
-    with (
-        bn.load(str(FIXTURES / f"zlib-{request.param}-O2")) as optimized,
-        bn.load(str(FIXTURES / f"zlib-{request.param}-Os")) as small,
-    ):
-        for view in (optimized, small):
-            view.update_analysis_and_wait()
-        yield optimized, small
-
-
 def _function(view, name):
     (symbol,) = view.get_symbols_by_name(name)
     function = view.get_function_at(symbol.address)
@@ -123,3 +111,38 @@ def test_render_paints_real_ranges_and_keeps_headers_neutral(views):
             assert (start, end) in ranges
             if start <= function.start < end:
                 assert kind == changed, "the function header must not look removed or added"
+
+
+def test_mid_size_functions_keep_the_instruction_level_diff(views):
+    """_deflate must stay on the greedy pairing, and the largest function must still be quick."""
+    import time
+
+    from mcrit_similarity.export import export_smda_report
+    from mcrit_similarity.picblocks import _annotations, annotation_blocks
+    from mcrit_similarity.render import _block_hashes
+
+    if views[0].arch is not None and "x86" not in str(views[0].arch.name):
+        pytest.skip("the measured budget figures come from the x86_64 fixtures")
+    reports = [export_smda_report(view) for view in views]
+
+    def hashes(name):
+        return [
+            _block_hashes(report, _function(view, name).start)
+            for view, report in zip(views, reports, strict=True)
+        ]
+
+    source, target = hashes("_deflate")
+    assert source and target
+    _annotations.cache_clear()
+    painted = annotation_blocks(source, target)
+    changed = sum(1 for side in painted for annotation in side if annotation.changed)
+    assert changed >= 300, (
+        f"_deflate ({len(source)} vs {len(target)} blocks) fell back to positional pairing"
+    )
+
+    source, target = hashes("_inflate")
+    _annotations.cache_clear()
+    start = time.perf_counter()
+    annotation_blocks(source, target)
+    elapsed = time.perf_counter() - start
+    assert elapsed < 3.0, f"aligning _inflate took {elapsed:.2f}s"
