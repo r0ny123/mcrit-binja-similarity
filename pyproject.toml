@@ -22,7 +22,7 @@ dependencies = [
 # which would make a property failure reproduce on one machine and not the next.
 dev = ["pytest", "ruff", "ty", "hypothesis==6.168.0"]
 # Only the end-to-end tests need an MCRIT server; it is a heavy install.
-e2e = ["mcrit==1.9.0"]
+e2e = ["mcrit==1.11.0"]
 
 [tool.ruff]
 target-version = "py312"
