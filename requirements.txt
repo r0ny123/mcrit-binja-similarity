@@ -1,2 +1,2 @@
-smda==4.8.0
+smda==4.9.0
 requests
