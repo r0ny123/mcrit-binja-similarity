@@ -11,7 +11,7 @@ DEFAULT_PICHASH_SIZE = 10
 DEFAULT_BAND_MATCHES = 2
 DEFAULT_MAX_RESULTS = 5
 
-GROUP = "mcrit"
+GROUP = "mcrit_similarity"
 PROVIDER_SETTINGS_ID = "mcrit-similarity"
 
 

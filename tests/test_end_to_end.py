@@ -66,7 +66,7 @@ def _make_provider(server: str, **overrides: Any):
         **overrides,
     }
     for key, value in values.items():
-        full = f"mcrit.{key}"
+        full = f"mcrit_similarity.{key}"
         if isinstance(value, bool):
             settings.set_bool(full, value)
         elif isinstance(value, int):
@@ -360,9 +360,9 @@ def silent_server():
 def short_request_timeout():
     """The HTTP timeout is a global setting, not part of the provider settings object."""
     settings = bn.Settings()
-    settings.set_integer("mcrit.timeout", REQUEST_TIMEOUT)
+    settings.set_integer("mcrit_similarity.timeout", REQUEST_TIMEOUT)
     yield REQUEST_TIMEOUT
-    settings.reset("mcrit.timeout")
+    settings.reset("mcrit_similarity.timeout")
 
 
 @pytest.fixture
@@ -506,8 +506,8 @@ def test_the_headless_example_runs_against_the_server(matched, monkeypatch, caps
     """examples/headless_mcrit.py stays in step with the API it demonstrates."""
     script = FIXTURES.parent.parent / "examples" / "headless_mcrit.py"
     settings = bn.Settings()
-    previous = settings.get_string("mcrit.server")
-    settings.set_string("mcrit.server", matched.server)
+    previous = settings.get_string("mcrit_similarity.server")
+    settings.set_string("mcrit_similarity.server", matched.server)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -522,6 +522,6 @@ def test_the_headless_example_runs_against_the_server(matched, monkeypatch, caps
     except SystemExit as exit_:
         assert exit_.code in (0, None), exit_.code
     finally:
-        settings.set_string("mcrit.server", previous)
+        settings.set_string("mcrit_similarity.server", previous)
     lines = capsys.readouterr().out.splitlines()
     assert any(line.startswith("_deflate -> _deflate:") for line in lines), lines[-5:]

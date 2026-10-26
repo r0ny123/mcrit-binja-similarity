@@ -21,6 +21,10 @@ from mcrit_similarity.log import log_error
 SECRET_KEY = "api_token"
 KEYCHAIN_PROVIDER = "SystemSecretsProvider"
 
+# The disassembler plugin (mcrit-plugin) registers its own settings under the "mcrit" group,
+# so this plugin's keys live under "mcrit_similarity" and both stay apart in the Settings UI.
+_GROUP_TITLE = "MCRIT Binary Similarity"
+
 _PROVIDER_SCHEMA = (
     ("server", "string", DEFAULT_SERVER, "MCRIT server URL for this session."),
     ("minhash_threshold", "number", DEFAULT_MINHASH_THRESHOLD, "Minimum MinHash score (0-100)."),
@@ -60,7 +64,7 @@ def register_global_settings() -> None:
     from binaryninja import SecretsProvider, Settings
 
     settings = Settings()
-    settings.register_group(GROUP, "MCRIT")
+    settings.register_group(GROUP, _GROUP_TITLE)
     declarations = {
         "server": {
             "title": "Server URL",
@@ -143,7 +147,7 @@ def default_provider_settings():
     from binaryninja import Settings
 
     settings = Settings(PROVIDER_SETTINGS_ID)
-    settings.register_group(GROUP, "MCRIT")
+    settings.register_group(GROUP, _GROUP_TITLE)
     number_ranges = {
         "minhash_threshold": (0, 100),
         "pichash_size": (0, 1000),

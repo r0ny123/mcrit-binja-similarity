@@ -37,7 +37,7 @@ This is a session provider for comparing binaries, not the MCRIT sidebar for bro
 
 3. Restart Binary Ninja. The log shows `Registered MCRIT Binary Similarity provider`.
 
-4. In Settings (`Ctrl+,` / `Cmd+,`), search for `mcrit` and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT server, or `https://<host>/api/` plus username and API token for mcritweb.
+4. In Settings (`Ctrl+,` / `Cmd+,`), search for `mcrit_similarity` and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT server, or `https://<host>/api/` plus username and API token for mcritweb.
 
 ## Set up an MCRIT server
 
@@ -61,7 +61,7 @@ Results appear per function in B with MCRIT's score (0 to 100) mapped to the 0 t
 
 ## Settings
 
-Settings > MCRIT (user scope):
+Settings > MCRIT Binary Similarity (user scope):
 
 | Setting | Meaning |
 |---|---|
@@ -73,13 +73,17 @@ Settings > MCRIT (user scope):
 To delete a stored token, in the Python console:
 
 ```python
-SecretsProvider["SystemSecretsProvider"].delete_data("mcrit.api_token")
+SecretsProvider["SystemSecretsProvider"].delete_data("mcrit_similarity.api_token")
 ```
 
 Provider settings live in the session's Configuration dialog: MinHash threshold, PicHash size, LSH bands, max candidates, include library matches, persist samples, family and version for uploads, and two options that are off by default:
 
 - Apply corpus labels: when applying a match where neither function has a real name, rename the source function to the target's MCRIT function label.
 - Query per node: with several incoming edges, query the whole corpus once and split the result per edge instead of running one MatcherVs per edge. This forces recalculation, so it is slower on large corpora, and it needs a direct MCRIT server.
+
+### Alongside the MCRIT disassembler plugin
+
+The [MCRIT plugin](https://github.com/familiary/mcrit-plugin) for IDA, Binary Ninja and Ghidra registers its settings under `mcrit` (shown as **MCRIT**). This plugin's settings live under `mcrit_similarity` (shown as **MCRIT Binary Similarity**), so with both installed, Binary Ninja's Settings shows two separate groups. Both can point at the same MCRIT server, and each keeps its own keychain token, so configure them independently.
 
 ### Behind mcritweb
 

@@ -19,9 +19,9 @@
         "Windows"
     ],
     "installinstructions": {
-        "Darwin": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT, then add the MCRIT provider in a Similarity Session (Ultimate).",
-        "Linux": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT, then add the MCRIT provider in a Similarity Session (Ultimate).",
-        "Windows": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT, then add the MCRIT provider in a Similarity Session (Ultimate)."
+        "Darwin": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT Binary Similarity, then add the MCRIT provider in a Similarity Session (Ultimate).",
+        "Linux": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT Binary Similarity, then add the MCRIT provider in a Similarity Session (Ultimate).",
+        "Windows": "Python dependencies (smda, requests) are installed automatically. Configure Settings > MCRIT Binary Similarity, then add the MCRIT provider in a Similarity Session (Ultimate)."
     },
     "dependencies": {
         "pip": [

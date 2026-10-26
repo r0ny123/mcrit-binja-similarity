@@ -229,14 +229,16 @@ def secrets(keychain):
 @given(st.text(max_size=16), st.booleans(), st.booleans())
 @PROPERTY
 def test_migration_never_deletes_a_stored_token(typed, has_stored, store_ok):
-    keychain = FakeKeychain({"mcrit.api_token": "stored"} if has_stored else {}, store_ok)
+    keychain = FakeKeychain(
+        {"mcrit_similarity.api_token": "stored"} if has_stored else {}, store_ok
+    )
     token = _migrate_token(FakeSettings(typed), secrets(keychain))
     assert keychain.deletes == 0
     if typed:
         assert token == typed
     elif has_stored:
         assert token == "stored"
-        assert keychain.data["mcrit.api_token"] == "stored"
+        assert keychain.data["mcrit_similarity.api_token"] == "stored"
     else:
         assert token == ""
 
@@ -250,10 +252,10 @@ def test_a_keychain_that_refuses_to_store_keeps_the_typed_value():
 
 
 def test_an_empty_field_never_clears_the_keychain():
-    keychain = FakeKeychain({"mcrit.api_token": "stored"})
+    keychain = FakeKeychain({"mcrit_similarity.api_token": "stored"})
     for _ in range(3):
         assert _migrate_token(FakeSettings(""), secrets(keychain)) == "stored"
-    assert keychain.data == {"mcrit.api_token": "stored"}
+    assert keychain.data == {"mcrit_similarity.api_token": "stored"}
 
 
 def test_the_keychain_provider_name_is_the_system_one():
