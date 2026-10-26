@@ -124,6 +124,8 @@ It reads the server settings configured in Settings.
 
 ## Troubleshooting
 
+Binary Ninja's own [troubleshooting guide](https://docs.binary.ninja/guide/similarity.html#troubleshooting) covers session-side issues (no results, resolver thresholds, results that cannot be navigated or applied). Plugin-side ones:
+
 - **Log says `MCRIT Similarity requires Binary Ninja Ultimate 6.0+`** — Binary Similarity needs Ultimate; the plugin intentionally stays idle otherwise.
 - **No results / requests fail** — check the server URL: mcritweb wants the trailing `/api/`, the direct API does not. Raise *Request timeout* for slow uploads.
 - **`403` on upload** — mcritweb needs a contributor or admin token to persist samples. If both samples are already on the server, turning *persist samples* off also unblocks the session.
