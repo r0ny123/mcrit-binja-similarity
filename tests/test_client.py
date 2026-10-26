@@ -21,7 +21,7 @@ class FakeResponse:
 def test_add_report_and_sha_lookup():
     client = McritClient("http://127.0.0.1:8000", apitoken="secret", username="user")
     sample = {"sample_id": 7, "sha256": "ab"}
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": sample})
         assert client.get_sample_by_sha256("ab") == sample
         request.return_value = FakeResponse(
@@ -36,7 +36,7 @@ def test_add_report_and_sha_lookup():
 
 def test_auth_error():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(403, {"status": "failed"})
         with pytest.raises(McritAuthError, match="contributor"):
             client.add_report({})
@@ -44,7 +44,7 @@ def test_auth_error():
 
 def test_server_error():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(500, {"status": "failed"})
         with pytest.raises(McritHttpError):
             client.get_version()
@@ -68,7 +68,7 @@ def test_functions_by_ids_posts_comma_separated_batches():
 
     with (
         patch("mcrit_similarity.mcrit.client._FUNCTION_BATCH", 2),
-        patch("mcrit_similarity.mcrit.client.requests.request", side_effect=fake_request),
+        patch("mcrit_similarity.mcrit.client._send", side_effect=fake_request),
     ):
         entries = client.get_functions_by_ids([1, 2, 3])
     assert bodies == [

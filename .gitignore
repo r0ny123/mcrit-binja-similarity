@@ -16,3 +16,4 @@ dist/
 benchmarks/
 AGENTS.md
 .editorconfig
+.DS_Store

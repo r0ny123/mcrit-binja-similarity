@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from mcrit_similarity.cache import LockedCache
 from mcrit_similarity.export import cached_report
 from mcrit_similarity.log import log_debug, log_warn
 from mcrit_similarity.picblocks import BlockHash, annotation_blocks, hash_smda_function
+
+# (report sha256, function offset) -> PicBlock hashes. Render runs on the UI thread, so a
+# re-opened comparison must not re-hash every instruction of both functions again.
+_PICBLOCKS = LockedCache(max_items=128)
 
 
 def _report_for_view(view) -> object | None:
@@ -27,16 +32,21 @@ def _block_hashes(report, address: int) -> list[BlockHash]:
     function = _smda_function(report, address)
     if function is None or report is None:
         return []
-    try:
-        return hash_smda_function(
-            function,
-            report.architecture,
-            int(report.base_addr or 0),
-            int(report.binary_size or 0),
-        )
-    except Exception as exc:
-        log_debug(f"PicBlock hashing failed at {address:#x}: {exc}")
-        return []
+    sha256 = getattr(report, "sha256", "") or ""
+
+    def _hash() -> list[BlockHash]:
+        try:
+            return hash_smda_function(
+                function,
+                report.architecture,
+                int(report.base_addr or 0),
+                int(report.binary_size or 0),
+            )
+        except Exception as exc:
+            log_debug(f"PicBlock hashing failed at {address:#x}: {exc}")
+            return []
+
+    return _PICBLOCKS.get_or_set((sha256, function.offset), _hash, cache_empty=True)
 
 
 def _range_for_block(bn_function, offset: int, size: int) -> tuple[int, int]:

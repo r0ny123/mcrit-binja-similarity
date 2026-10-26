@@ -1,12 +1,14 @@
 """HTTP client for the MCRIT REST subset used by Binary Similarity.
 
-Method names and routes match core ``mcrit.client.McritClient``. Requests are
-one-shot (no shared Session) so overlapping provider visits stay thread-safe.
+Method names and routes match core ``mcrit.client.McritClient``. Each thread reuses one
+``requests.Session``, so connections (and TLS handshakes) are pooled without ever sharing
+a Session between overlapping provider visits.
 """
 
 from __future__ import annotations
 
 import random
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
@@ -26,6 +28,21 @@ _RETRY_STATUS = frozenset({502, 503, 504})
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 0.5
 _RETRY_MAX_DELAY = 4.0
+
+_LOCAL = threading.local()
+
+
+def _send(method: str, url: str, **kwargs: Any) -> requests.Response:
+    """Perform one HTTP request through the calling thread's Session.
+
+    A Session pools connections, but holding one per thread keeps cookies and pool state
+    out of the reach of other threads. One-shot threads pay one Session build, like a
+    one-shot ``requests.request`` did.
+    """
+    session = getattr(_LOCAL, "session", None)
+    if session is None:
+        session = _LOCAL.session = requests.Session()
+    return session.request(method, url, **kwargs)
 
 
 def _retry_delay(attempt: int) -> float:
@@ -81,7 +98,7 @@ class McritClient:
         for attempt in range(1, attempts + 1):
             last = attempt == attempts
             try:
-                response = requests.request(method, self._url(path), **kwargs)
+                response = _send(method, self._url(path), **kwargs)
             except requests.ConnectionError as exc:
                 # ConnectTimeout is both, and belongs with the timeouts.
                 if last or isinstance(exc, requests.Timeout):

@@ -24,6 +24,9 @@ _COLD_MAX_RAW_BYTES = 4 * 1024 * 1024
 _COLD_MAX_STORED_BYTES = 768 * 1024
 # session_id -> sha256 of the file, or "" when it is too large to hash on the UI thread.
 _COLD_SHA256 = LockedCache()
+# (session_id, raw length) -> sha256 of the file bytes. Raw bytes do not change while a file
+# stays open, so it is hashed once per process instead of on every export and preload.
+_RAW_SHA256 = LockedCache()
 # (session_id, key) pairs whose report could not be loaded for the cold render path.
 _COLD_MISSES = LockedCache()
 # session_id -> key of its last export. A later export under another key means analysis
@@ -53,12 +56,20 @@ def _raw_sha256(raw) -> str:
     return digest.hexdigest()
 
 
+def _raw_sha256_cached(bv) -> str:
+    raw = bv.file.raw
+    if raw is None or raw.length <= 0:
+        return ""
+    key = (bv.file.session_id, raw.length)
+    return _RAW_SHA256.get_or_set(key, lambda: _raw_sha256(raw))
+
+
 def _view_cache_key(bv) -> tuple[str, int] | None:
     """Content key for a view's report, or None when there is no file data to identify it by."""
     raw = bv.file.raw
     if raw is None or raw.length <= 0:
         return None
-    return _raw_sha256(raw), len(bv.functions)
+    return _raw_sha256_cached(bv), len(bv.functions)
 
 
 def _cold_sha256(bv) -> str:
@@ -110,7 +121,7 @@ def preload_report(bv) -> None:
     folder = _disk_folder()
     if folder is None or REPORT_KEYS.get(session) is not None:
         return
-    sha256 = _raw_sha256(raw)
+    sha256 = _raw_sha256_cached(bv)
     if raw.length <= _COLD_MAX_RAW_BYTES:
         _COLD_SHA256.set(session, sha256)
     key = (sha256, len(bv.functions))

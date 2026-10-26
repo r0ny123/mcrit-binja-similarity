@@ -112,12 +112,24 @@ def parse_vs_result(
     limit = max(1, int(max_results))
     for offset in grouped:
         ranked = sorted(grouped[offset], key=_match_sort_key)
-        scores = sorted((match.score for match in ranked), reverse=True)
+        # One pass for the top two scores and the PicHash count; no full score sort.
+        candidates = len(ranked)
+        best_score = None
+        runner_up_score = None
+        pichash_candidates = 0
+        for match in ranked:
+            if match.is_pichash:
+                pichash_candidates += 1
+            if best_score is None or match.score >= best_score:
+                runner_up_score = best_score
+                best_score = match.score
+            elif runner_up_score is None or match.score > runner_up_score:
+                runner_up_score = match.score
         stats = {
-            "candidates": len(ranked),
-            "best_score": scores[0],
-            "runner_up_score": scores[1] if len(scores) > 1 else None,
-            "pichash_candidates": sum(1 for match in ranked if match.is_pichash),
+            "candidates": candidates,
+            "best_score": best_score,
+            "runner_up_score": runner_up_score,
+            "pichash_candidates": pichash_candidates,
         }
         selected.extend(replace(match, **stats) for match in ranked[:limit])
     return selected

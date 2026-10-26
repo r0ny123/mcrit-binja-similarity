@@ -94,7 +94,8 @@ def hash_smda_function(
             for instruction in block.getInstructions()
         )
         text = "".join(instruction.escaped for instruction in instructions)
-        payload = bytes(ord(c) for c in text)
+        # The escaper only emits Latin-1 characters; encode() equals bytes(ord(c) ...) but in C.
+        payload = text.encode("latin-1")
         byte_size = sum(instruction.size for instruction in instructions)
         if byte_size <= 0:
             byte_size = max(getattr(block, "length", 1) or 1, 1)

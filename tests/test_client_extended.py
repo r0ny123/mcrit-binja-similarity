@@ -37,7 +37,7 @@ def test_token_rejected_over_insecure_http():
 
 def test_redirects_blocked():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(302)
         with pytest.raises(McritHttpError, match="redirect"):
             client.get_version()
@@ -46,7 +46,7 @@ def test_redirects_blocked():
 
 def test_http_400_raises_detailed_error():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(400, {"message": "Invalid threshold parameter"})
         with pytest.raises(McritHttpError, match="Invalid threshold parameter"):
             client.get_version()
@@ -54,7 +54,7 @@ def test_http_400_raises_detailed_error():
 
 def test_response_size_limit_exceeded():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(
             200,
             payload={"status": "successful", "data": {}},
@@ -66,7 +66,7 @@ def test_response_size_limit_exceeded():
 
 def test_sample_corpus_request_sends_matching_params():
     client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": "job-7"})
         assert (
             client.request_matches_for_sample(

@@ -71,7 +71,7 @@ def test_a_blank_server_is_rejected(blank):
     ],
 )
 def test_status_codes_map_to_project_errors(status, error):
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(status, {"message": "nope"})
         with pytest.raises(error):
             client().get_version()
@@ -79,7 +79,7 @@ def test_status_codes_map_to_project_errors(status, error):
 
 @pytest.mark.parametrize("status", [404, 410])
 def test_absent_resources_are_a_miss_not_an_error(status):
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(status, {})
         assert client().get_sample_by_sha256("ab") is None
         assert client().get_job_data("j1") is None
@@ -96,14 +96,14 @@ def test_absent_resources_are_a_miss_not_an_error(status):
 )
 def test_connection_failures_become_unavailable(exception):
     with (
-        patch("mcrit_similarity.mcrit.client.requests.request", side_effect=exception),
+        patch("mcrit_similarity.mcrit.client._send", side_effect=exception),
         pytest.raises(McritUnavailableError, match="MCRIT request failed"),
     ):
         client().get_version()
 
 
 def test_a_non_json_body_is_rejected():
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, None, text="<html>")
         with pytest.raises(McritHttpError, match="non-JSON"):
             client().get_version()
@@ -112,7 +112,7 @@ def test_a_non_json_body_is_rejected():
 @given(st.one_of(st.none(), st.integers(), st.text(), st.lists(st.integers(), max_size=3)))
 @PROPERTY
 def test_unexpected_payload_shapes_do_not_leak(payload):
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": payload})
         instance = client()
         assert instance.get_version() is None or isinstance(instance.get_version(), str)
@@ -124,7 +124,7 @@ def test_unexpected_payload_shapes_do_not_leak(payload):
 
 def test_envelopes_are_unwrapped_only_when_they_carry_data():
     plain = {"matches": {}, "info": {}}
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, plain)
         assert client().get_result("r1") == plain
         request.return_value = FakeResponse(202, {"data": "job-1"})
@@ -147,7 +147,7 @@ def test_function_lookups_are_split_into_bounded_batches(count):
             200, {"status": "successful", "data": {str(i): {"offset": i} for i in ids}}
         )
 
-    with patch("mcrit_similarity.mcrit.client.requests.request", side_effect=record):
+    with patch("mcrit_similarity.mcrit.client._send", side_effect=record):
         mapped = client().get_functions_by_ids(ids)
     assert len(bodies) == (count + _FUNCTION_BATCH - 1) // _FUNCTION_BATCH
     assert all(len(body.split(",")) <= _FUNCTION_BATCH for body in bodies)
@@ -158,7 +158,7 @@ def test_function_lookups_are_split_into_bounded_batches(count):
 
 
 def test_function_lookup_skips_unusable_keys():
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(
             200, {"status": "successful", "data": {"7": {"offset": 1}, "oops": {}, "": None}}
         )
@@ -167,7 +167,7 @@ def test_function_lookup_skips_unusable_keys():
 
 def test_headers_and_timeout_reach_every_request():
     instance = McritClient("https://mcrit.example", apitoken="tok", username="me", timeout=7)
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": {"version": "1"}})
         assert instance.get_version() == "1"
         kwargs = request.call_args.kwargs
@@ -196,7 +196,7 @@ def test_loopback_keeps_working_over_http(server):
 
 
 def test_oversized_responses_are_refused_before_parsing():
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(
             200, {"status": "successful", "data": {}}, headers={"Content-Length": str(10**12)}
         )
@@ -211,7 +211,7 @@ def test_oversized_responses_are_refused_before_parsing():
 
 
 def test_matching_parameters_are_omitted_when_unset():
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": "job"})
         client().request_matches_for_sample_vs(1, 2)
         assert request.call_args.kwargs["params"] == {}
@@ -226,7 +226,7 @@ def test_matching_parameters_are_omitted_when_unset():
 
 
 def test_add_report_requires_sample_info():
-    with patch("mcrit_similarity.mcrit.client.requests.request") as request:
+    with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": {"job_id": "j"}})
         with pytest.raises(McritHttpError, match="sample_info"):
             client().add_report({})
