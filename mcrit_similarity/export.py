@@ -144,8 +144,7 @@ def _build_report(bv) -> object:
 
     interface = BinjaSmdaInterface(bv)
     disassembler = Disassembler()
-    disassembler.disassembler = IdaExporter(disassembler.config, ida_interface=interface)
-    disassembler._explicit_backend = True
+    disassembler.setExporter(IdaExporter(disassembler.config, ida_interface=interface))
     report = disassembler.disassembleBuffer(
         interface.getBinary(),
         interface.getBaseAddr(),

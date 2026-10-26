@@ -25,7 +25,7 @@
     },
     "dependencies": {
         "pip": [
-            "smda==4.8.0",
+            "smda==5.0.1",
             "requests"
         ]
     },
