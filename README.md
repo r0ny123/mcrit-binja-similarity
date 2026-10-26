@@ -61,7 +61,7 @@ The first `up` builds both images and takes a while. Register the first account 
 3. `Configuration > Add Provider > MCRIT`. BinDiff and WARP can join the same session, and the Metric Similarity Resolver applies the best match automatically.
 4. `Start`.
 
-Every function in B gets its best MCRIT match in A, with MCRIT's 0–100 score mapped to Binary Ninja's 0–255 similarity scale. `Apply` copies names, types and comments from the matched function, like the built-in providers. Functions whose name both sides share (check a few known ones) should match themselves — that is the quickest way to confirm the setup works.
+Every function in B gets its best MCRIT match in A, with MCRIT's 0–100 score mapped to Binary Ninja's 0–255 similarity scale. `Apply` copies names, types, variable info and comments from the matched function, like the built-in providers. Functions whose name both sides share (check a few known ones) should match themselves — that is the quickest way to confirm the setup works.
 
 ## Settings
 

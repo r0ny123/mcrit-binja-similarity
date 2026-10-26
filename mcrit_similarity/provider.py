@@ -87,7 +87,9 @@ def _entities(node: SimilaritySessionNode) -> list[Entity]:
     collected: list[Entity] = []
     for entity_id in node.entities:
         info = node.get_entity(entity_id)
-        if info is None:
+        # Only functions can carry a match: BN plans more entity types (data, types), and
+        # indexing those by address would pair them with functions.
+        if info is None or info.type is not SimilarityEntityType.SimilarityEntityFunction:
             continue
         collected.append(Entity(entity_id, info.address, info.name))
     return collected
