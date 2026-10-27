@@ -9,7 +9,7 @@ from mcrit_similarity.picblocks import BlockHash, annotation_blocks, hash_smda_f
 
 # (report sha256, function offset) -> PicBlock hashes. Render runs on the UI thread, so a
 # re-opened comparison must not re-hash every instruction of both functions again.
-_PICBLOCKS = LockedCache(max_items=128)
+_PICBLOCKS = LockedCache(max_items=1024)
 
 
 def _report_for_view(view) -> object | None:
