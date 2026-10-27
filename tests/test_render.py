@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 from mcrit_similarity.cache import REPORT_KEYS, REPORTS
 from mcrit_similarity.picblocks import BlockHash, InstructionHash, hash_escaped_block
-from mcrit_similarity.render import _range_for_block, _report_for_view, _smda_function, render_match
+from mcrit_similarity.render import _range_for_block, _report_for_view, render_match, smda_function
 
 
 class FakeBasicBlock:
@@ -19,7 +19,7 @@ class FakeFunction:
 
     def get_basic_block_at(self, addr: int):
         for b in self.basic_blocks:
-            if b.start == addr:
+            if b.start <= addr < b.end:
                 return b
         return None
 
@@ -89,9 +89,9 @@ def test_render_match_warns_once_when_report_is_not_cached():
 def test_smda_function_thumb_alias():
     report = Mock()
     report.getFunction.side_effect = lambda addr: "fn" if addr == 0x1000 else None
-    assert _smda_function(report, 0x1001) == "fn"
-    assert _smda_function(report, 0x2000) is None
-    assert _smda_function(None, 0x1000) is None
+    assert smda_function(report, 0x1001) == "fn"
+    assert smda_function(report, 0x2000) is None
+    assert smda_function(None, 0x1000) is None
 
 
 def test_render_match_paints_nothing_for_identical_blocks():
@@ -114,7 +114,7 @@ def test_render_match_skips_on_asymmetric_cache_miss():
     tgt_fn = FakeFunction(0x2000, FakeView(), [FakeBasicBlock(0x2000, 0x2030)])
 
     with (
-        patch("mcrit_similarity.render._report_for_view", side_effect=[None, object()]),
+        patch("mcrit_similarity.render._report_for_view", side_effect=[None, Mock()]),
         patch("binaryninja.similarity.DiffRenderer") as MockRenderer,
     ):
         render_match(Mock(), src_fn, tgt_fn, Mock(), Mock())

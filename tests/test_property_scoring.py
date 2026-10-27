@@ -6,7 +6,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from mcrit_similarity.scoring import (
-    IS_LIBRARY_FLAG,
     IS_MINHASH_FLAG,
     IS_PICHASH_FLAG,
     clamp_score,
@@ -111,16 +110,6 @@ def test_tie_halves_and_a_clear_lead_keeps_confidence():
 @PROPERTY
 def test_clamp_keeps_the_byte_range(value):
     assert 0 <= clamp_score(value) <= 255
-
-
-@given(st.integers(min_value=0, max_value=255))
-@PROPERTY
-def test_flag_predicates_match_the_bits(flags):
-    from mcrit_similarity.scoring import is_library, is_minhash, is_pichash
-
-    assert is_pichash(flags) == bool(flags & IS_PICHASH_FLAG)
-    assert is_library(flags) == bool(flags & IS_LIBRARY_FLAG)
-    assert is_minhash(flags) == bool(flags & IS_MINHASH_FLAG)
 
 
 @given(st.floats(min_value=0, max_value=100, allow_nan=False))

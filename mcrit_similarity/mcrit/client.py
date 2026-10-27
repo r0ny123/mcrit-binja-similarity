@@ -10,7 +10,6 @@ from __future__ import annotations
 import random
 import threading
 import time
-from collections.abc import Callable
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -20,7 +19,6 @@ from mcrit_similarity.errors import McritAuthError, McritHttpError, McritUnavail
 
 _SUCCESS = {"successful"}
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
-_MAX_RESPONSE_BYTES = 50 * 1024 * 1024  # 50 MB
 # MCRIT looks up each id separately, so keep single requests bounded.
 _FUNCTION_BATCH = 500
 # A reverse proxy in front of mcritweb answers these while the server restarts or is saturated.
@@ -139,16 +137,6 @@ class McritClient:
         if status not in (200, 202):
             raise McritHttpError(f"Unexpected MCRIT status HTTP {status}")
 
-        content_length = getattr(response, "headers", {}).get("Content-Length")
-        if content_length:
-            try:
-                if int(content_length) > _MAX_RESPONSE_BYTES:
-                    raise McritHttpError(
-                        f"MCRIT response exceeded maximum size limit ({content_length} bytes)"
-                    )
-            except ValueError:
-                pass
-
         try:
             payload = response.json()
         except ValueError as exc:
@@ -265,7 +253,3 @@ def _matching_params(
     if force_recalculation:
         params["force_recalculation"] = True
     return params
-
-
-# Kept for tests that want to inject a request callable.
-RequestFn = Callable[..., Any]

@@ -41,10 +41,6 @@ class FunctionMatch:
     def is_pichash(self) -> bool:
         return bool(self.flags & IS_PICHASH_FLAG)
 
-    @property
-    def is_library(self) -> bool:
-        return bool(self.flags & IS_LIBRARY_FLAG)
-
 
 def _as_flags(value: Any) -> int:
     if isinstance(value, bool):
@@ -181,21 +177,13 @@ def target_functions(entries: dict[int, dict[str, Any]]) -> dict[int, tuple[int,
 def with_target_offsets(
     matches: Iterable[FunctionMatch], offsets_by_fid: dict[int, int]
 ) -> list[FunctionMatch]:
-    filled: list[FunctionMatch] = []
-    for match in matches:
-        offset = offsets_by_fid.get(match.target_function_id)
-        if offset is None:
-            filled.append(match)
-            continue
-        filled.append(replace(match, target_offset=offset))
-    return filled
+    return [
+        replace(
+            match, target_offset=offsets_by_fid.get(match.target_function_id, match.target_offset)
+        )
+        for match in matches
+    ]
 
 
 def unique_target_function_ids(matches: Iterable[FunctionMatch]) -> list[int]:
-    seen: set[int] = set()
-    ids: list[int] = []
-    for match in matches:
-        if match.target_function_id not in seen:
-            seen.add(match.target_function_id)
-            ids.append(match.target_function_id)
-    return ids
+    return list(dict.fromkeys(match.target_function_id for match in matches))

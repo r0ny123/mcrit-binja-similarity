@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from mcrit_similarity.errors import McritError, McritUnavailableError
-from mcrit_similarity.log import log_info
+from mcrit_similarity.log import log_info, log_warn
 from mcrit_similarity.mcrit.jobs import JobClient, StopFn, await_job, job_state, resolve_matches
 
 ProgressFn = Callable[[float], None]
@@ -146,7 +146,7 @@ def ensure_sample(
         smda_report.version = version
     filename = getattr(smda_report, "filename", "") or "sample"
     count = getattr(smda_report, "num_functions", "?")
-    log_info(
+    log_warn(
         f"Uploading {filename} (sha256 {sha256[:12]}…, {count} functions) "
         f"to MCRIT at {client.mcrit_server}"
     )

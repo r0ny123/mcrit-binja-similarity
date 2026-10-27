@@ -16,20 +16,15 @@ def _report_for_view(view) -> object | None:
     return cached_report(view) if view is not None else None
 
 
-def _smda_function(report, address: int):
+def smda_function(report, address: int):
     if report is None:
         return None
-    getter = getattr(report, "getFunction", None)
-    if getter is None:
-        return None
-    function = getter(address)
-    if function is not None:
-        return function
-    return getter(address & ~1)
+    function = report.getFunction(address)
+    return function if function is not None else report.getFunction(address & ~1)
 
 
 def _block_hashes(report, address: int) -> list[BlockHash]:
-    function = _smda_function(report, address)
+    function = smda_function(report, address)
     if function is None or report is None:
         return []
     sha256 = getattr(report, "sha256", "") or ""
@@ -50,14 +45,9 @@ def _block_hashes(report, address: int) -> list[BlockHash]:
 
 
 def _range_for_block(bn_function, offset: int, size: int) -> tuple[int, int]:
-    get_bb = getattr(bn_function, "get_basic_block_at", None)
-    if get_bb is not None:
-        bb = get_bb(offset)
-        if bb is not None:
-            return bb.start, bb.end
-    for block in getattr(bn_function, "basic_blocks", []):
-        if block.start <= offset < block.end:
-            return block.start, block.end
+    block = bn_function.get_basic_block_at(offset)
+    if block is not None:
+        return block.start, block.end
     return offset, offset + max(size, 1)
 
 

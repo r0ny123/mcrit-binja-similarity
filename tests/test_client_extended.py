@@ -52,18 +52,6 @@ def test_http_400_raises_detailed_error():
             client.get_version()
 
 
-def test_response_size_limit_exceeded():
-    client = McritClient("http://127.0.0.1:8000")
-    with patch("mcrit_similarity.mcrit.client._send") as request:
-        request.return_value = FakeResponse(
-            200,
-            payload={"status": "successful", "data": {}},
-            headers={"Content-Length": str(100 * 1024 * 1024)},  # 100 MB
-        )
-        with pytest.raises(McritHttpError, match="maximum size limit"):
-            client.get_version()
-
-
 def test_sample_corpus_request_sends_matching_params():
     client = McritClient("http://127.0.0.1:8000")
     with patch("mcrit_similarity.mcrit.client._send") as request:

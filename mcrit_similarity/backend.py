@@ -160,9 +160,6 @@ class BinjaSmdaInterface:
                 api_map[symbol.address] = name
         return api_map
 
-    def getApiOffsets(self):
-        return self.getApiMap()
-
     def isExternalFunction(self, function_offset):
         return any(
             section.name in _SYNTHETIC_SECTIONS

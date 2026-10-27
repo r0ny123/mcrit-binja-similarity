@@ -24,7 +24,7 @@ def test_parse_filters_and_ranks(vs_result):
     assert first[0].target_function_id == 20
     assert first[0].score == 100.0
     assert first[1].target_function_id == 21
-    assert all(not match.is_library for match in matches)
+    assert all(not match.flags & IS_LIBRARY_FLAG for match in matches)
     assert 0x401100 in by_offset
 
 

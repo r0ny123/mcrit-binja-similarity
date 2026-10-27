@@ -21,7 +21,7 @@ from binaryninja.similarity import (
 from mcrit_similarity import PROVIDER_NAME
 from mcrit_similarity.cache import FUNCTION_OFFSETS, SAMPLES, LockedCache
 from mcrit_similarity.config import ProviderConfig
-from mcrit_similarity.errors import McritAuthError, McritError, McritJobError
+from mcrit_similarity.errors import McritError, McritJobError
 from mcrit_similarity.export import export_smda_report
 from mcrit_similarity.log import log_debug, log_error, log_info, log_warn
 from mcrit_similarity.mapping import Entity, index_entities, lookup_entity, pair_matches
@@ -33,7 +33,7 @@ from mcrit_similarity.mcrit.parse import (
     with_target_offsets,
 )
 from mcrit_similarity.mcrit.samples import ensure_sample, match_sample_corpus, match_sample_vs
-from mcrit_similarity.render import render_match
+from mcrit_similarity.render import render_match, smda_function
 from mcrit_similarity.settings import (
     config_from_settings,
     default_provider_settings,
@@ -76,7 +76,9 @@ def _has_default_name(function) -> bool:
 
 def _target_has_default_name(node: SimilaritySessionNode, result: int) -> bool:
     match = node.get_result(result)
-    neighbor = _node_by_id(node, match.target.node_id) if match is not None else None
+    if match is None:
+        return False
+    neighbor = _node_by_id(node, match.target.node_id)
     if neighbor is None:
         return False
     target = neighbor.get_entity_function(match.target.entity_id)
@@ -93,6 +95,43 @@ def _entities(node: SimilaritySessionNode) -> list[Entity]:
             continue
         collected.append(Entity(entity_id, info.address, info.name))
     return collected
+
+
+class _Stopped(Exception):
+    """The session asked to stop; unwinds the visit."""
+
+
+def _function_name(report, offset: int) -> str:
+    function = smda_function(report, offset)
+    if function is not None and function.function_name:
+        return str(function.function_name)
+    return f"sub_{offset:x}"
+
+
+def _add_match_only_entities(from_node, from_view, from_report, matches, target_index) -> None:
+    """Create entities for matched functions the node does not list, so they can be paired."""
+    for match in matches:
+        offset = match.target_offset
+        if offset is None:
+            log_debug(
+                f"MCRIT match {match.source_offset:#x} has no target offset "
+                f"for function {match.target_function_id}"
+            )
+            continue
+        if lookup_entity(target_index, offset) is not None:
+            continue
+        function = from_view.get_function_at(offset)
+        if function is None:
+            function = from_view.get_function_at(offset & ~1)
+        if function is None:
+            log_debug(f"MCRIT match target {offset:#x} has no function in the target view")
+            continue
+        name = _function_name(from_report, offset)
+        entity_id = from_node.create_entity(
+            SimilarityEntityInfo(SimilarityEntityType.SimilarityEntityFunction, offset, name)
+        )
+        target_index[offset] = Entity(entity_id, offset, name)
+        log_debug(f"Created match-only entity {entity_id} at {offset:#x}")
 
 
 class McritProviderType(SimilarityProviderType):
@@ -156,17 +195,15 @@ class McritProvider(SimilarityProvider):
     ) -> bool:
         try:
             return self._visit_edge(from_node, to_node, results, completion)
-        except McritJobError as exc:
-            if completion.is_stop_requested:
-                log_info("MCRIT matching stopped")
-                return False
-            log_error(str(exc))
-            return False
-        except McritAuthError as exc:
-            log_error(str(exc))
+        except _Stopped:
+            log_info("MCRIT matching stopped")
             return False
         except McritError as exc:
-            log_error(str(exc))
+            # A cancelled job raises McritJobError; any other error is a real failure.
+            if isinstance(exc, McritJobError) and completion.is_stop_requested:
+                log_info("MCRIT matching stopped")
+            else:
+                log_error(str(exc))
             return False
         except Exception:
             from binaryninja.log import log_error_for_exception
@@ -246,6 +283,29 @@ class McritProvider(SimilarityProvider):
             log_warn(f"MCRIT per-node query failed, using MatcherVs for this edge: {exc}")
             return None
 
+    def _match_payload(
+        self, client, config, from_sample, to_sample, to_node, should_stop, on_progress
+    ):
+        payload = None
+        if config.query_per_node:
+            payload = self._corpus_payload(
+                client, config, to_node, to_sample, should_stop, on_progress
+            )
+        if payload is not None:
+            return payload
+        if should_stop():
+            raise _Stopped
+        return match_sample_vs(
+            client,
+            to_sample.sample_id,
+            from_sample.sample_id,
+            minhash_threshold=config.minhash_threshold,
+            pichash_size=config.pichash_size,
+            band_matches_required=config.band_matches_required,
+            should_stop=should_stop,
+            on_progress=on_progress,
+        )
+
     def _visit_edge(
         self,
         from_node: SimilaritySessionNode,
@@ -253,7 +313,7 @@ class McritProvider(SimilarityProvider):
         results: SimilarityProviderResults,
         completion: SimilaritySessionCompletion,
     ) -> bool:
-        scheduled = list(to_node.scheduled_entities)
+        scheduled = set(to_node.scheduled_entities)
         if not scheduled:
             return True
         # Every .view access builds a new wrapper; fetch each once.
@@ -269,62 +329,30 @@ class McritProvider(SimilarityProvider):
         def should_stop() -> bool:
             return completion.is_stop_requested
 
-        self._progress(completion, to_node, 0.02)
+        def advance(progress: float) -> None:
+            self._progress(completion, to_node, progress)
+            if should_stop():
+                raise _Stopped
 
+        def span(start: float, end: float) -> Callable[[float], None]:
+            return self._scale_progress(completion, to_node, start, end)
+
+        advance(0.02)
         from_report = export_smda_report(from_view, should_stop=should_stop)
-        self._progress(completion, to_node, 0.18)
-        if completion.is_stop_requested:
-            return False
-
+        advance(0.18)
         to_report = export_smda_report(to_view, should_stop=should_stop)
-        self._progress(completion, to_node, 0.32)
-        if completion.is_stop_requested:
-            return False
+        advance(0.32)
 
         client = self._client()
-        from_sample = self._sample(
-            client,
-            config,
-            from_report,
-            should_stop,
-            self._scale_progress(completion, to_node, 0.32, 0.42),
+        from_sample = self._sample(client, config, from_report, should_stop, span(0.32, 0.42))
+        advance(0.42)
+        to_sample = self._sample(client, config, to_report, should_stop, span(0.42, 0.52))
+        advance(0.55)
+
+        payload = self._match_payload(
+            client, config, from_sample, to_sample, to_node, should_stop, span(0.55, 0.88)
         )
-        if completion.is_stop_requested:
-            return False
-
-        to_sample = self._sample(
-            client,
-            config,
-            to_report,
-            should_stop,
-            self._scale_progress(completion, to_node, 0.42, 0.52),
-        )
-        self._progress(completion, to_node, 0.55)
-        if completion.is_stop_requested:
-            return False
-
-        match_progress = self._scale_progress(completion, to_node, 0.55, 0.88)
-        payload = None
-        if config.query_per_node:
-            payload = self._corpus_payload(
-                client, config, to_node, to_sample, should_stop, match_progress
-            )
-            if completion.is_stop_requested:
-                return False
-        if payload is None:
-            payload = match_sample_vs(
-                client,
-                to_sample.sample_id,
-                from_sample.sample_id,
-                minhash_threshold=config.minhash_threshold,
-                pichash_size=config.pichash_size,
-                band_matches_required=config.band_matches_required,
-                should_stop=should_stop,
-                on_progress=match_progress,
-            )
-        if completion.is_stop_requested:
-            return False
-
+        advance(0.88)
         matches = parse_vs_result(
             payload,
             min_score=config.minhash_threshold,
@@ -332,76 +360,36 @@ class McritProvider(SimilarityProvider):
             max_results=config.max_results,
             target_sample_id=from_sample.sample_id,
         )
-        if completion.is_stop_requested:
-            return False
-
         targets = _target_functions(client, config.server, unique_target_function_ids(matches))
         matches = with_target_offsets(
             matches, {fid: offset for fid, (offset, _) in targets.items()}
         )
-        label_by_offset = {offset: label for offset, label in targets.values() if label}
-        self._progress(completion, to_node, 0.9)
-        if completion.is_stop_requested:
-            return False
+        advance(0.9)
 
         source_index = index_entities(_entities(to_node))
         target_index = index_entities(_entities(from_node))
-        for match in matches:
-            if match.target_offset is None:
-                log_debug(
-                    f"MCRIT match {match.source_offset:#x} has no target offset for function {match.target_function_id}"
-                )
-                continue
-            if lookup_entity(target_index, match.target_offset) is None:
-                get_fn = getattr(from_view, "get_function_at", None)
-                target_fn = get_fn(match.target_offset) if get_fn is not None else None
-                if target_fn is None and get_fn is not None:
-                    target_fn = get_fn(match.target_offset & ~1)
-                if target_fn is None:
-                    log_debug(
-                        f"MCRIT match target offset {match.target_offset:#x} has no function in target view; skipping entity creation"
-                    )
-                    continue
-                name = _function_name(from_report, match.target_offset) or getattr(
-                    target_fn, "name", None
-                )
-                entity_id = from_node.create_entity(
-                    SimilarityEntityInfo(
-                        SimilarityEntityType.SimilarityEntityFunction,
-                        match.target_offset,
-                        name,
-                    )
-                )
-                target_index[match.target_offset] = Entity(
-                    entity_id, match.target_offset, name or ""
-                )
-                log_debug(f"Created match-only entity {entity_id} at {match.target_offset:#x}")
-
-        if completion.is_stop_requested:
-            return False
-
-        scheduled_ids = set(scheduled)
-        paired, unresolved = pair_matches(matches, source_index, target_index, scheduled_ids)
+        _add_match_only_entities(from_node, from_view, from_report, matches, target_index)
+        paired, unresolved = pair_matches(matches, source_index, target_index, scheduled)
         for leftover in unresolved:
             log_debug(
                 f"Dropped MCRIT match {leftover.source_offset:#x} -> "
                 f"{leftover.target_offset!r}: entity mapping failed"
             )
 
-        target_node_id = from_node.id
-        labels = {
-            (target_node_id, pair.target_entity_id): label_by_offset[pair.target_offset]
-            for pair in paired
-            if pair.target_offset in label_by_offset
-        }
-        if labels:
-            with self._lock:
-                self._labels.update(labels)
+        corpus_labels = {offset: label for offset, label in targets.values() if label}
+        with self._lock:
+            self._labels.update(
+                {
+                    (from_node.id, pair.target_entity_id): corpus_labels[pair.target_offset]
+                    for pair in paired
+                    if pair.target_offset in corpus_labels
+                }
+            )
 
         emitted = 0
         for pair in paired:
-            if completion.is_stop_requested:
-                return False
+            if should_stop():
+                raise _Stopped
             result_id = results.add_result(
                 SimilarityEntityRef(to_node.id, pair.source_entity_id),
                 SimilarityEntityRef(from_node.id, pair.target_entity_id),
@@ -416,7 +404,7 @@ class McritProvider(SimilarityProvider):
             1
             for match in matches
             if (source := lookup_entity(source_index, match.source_offset)) is None
-            or source.entity_id in scheduled_ids
+            or source.entity_id in scheduled
         )
         if wanted and emitted == 0:
             log_error(
@@ -428,12 +416,9 @@ class McritProvider(SimilarityProvider):
         log_info(f"MCRIT reported {emitted} function matches for this edge")
         return True
 
-    def _label_for(self, node, result) -> str:
-        match = node.get_result(result)
-        if match is None:
-            return ""
+    def _label(self, target: SimilarityEntityRef) -> str:
         with self._lock:
-            return self._labels.get((match.target.node_id, match.target.entity_id), "")
+            return self._labels.get((target.node_id, target.entity_id), "")
 
     def perform_get_name(self, node, entity, result) -> str | None:
         match = node.get_result(result)
@@ -443,8 +428,7 @@ class McritProvider(SimilarityProvider):
         neighbor = _node_by_id(node, target.node_id)
         if neighbor is None:
             return None
-        with self._lock:
-            label = self._labels.get((target.node_id, target.entity_id), "")
+        label = self._label(target)
         info = neighbor.get_entity(target.entity_id)
         name = info.name if info is not None and info.name else ""
         if name and (not label or label == name):
@@ -461,7 +445,8 @@ class McritProvider(SimilarityProvider):
     def perform_apply(self, node, entity, result) -> SimilarityApplyStatus:
         with self._lock:
             enabled = self._config.apply_corpus_labels
-        label = self._label_for(node, result) if enabled else ""
+        match = node.get_result(result) if enabled else None
+        label = self._label(match.target) if match is not None else ""
         function = node.get_entity_function(entity) if label else None
         # A real target name is more specific than a corpus label, and the default apply copies it.
         if function is None or not _target_has_default_name(node, result):
@@ -498,14 +483,3 @@ class McritProvider(SimilarityProvider):
             SimilarityEntityRef(node.id, entity),
             SimilarityEntityRef(neighbor.id, match.target.entity_id),
         )
-
-
-def _function_name(report, offset: int) -> str:
-    getter = getattr(report, "getFunction", None)
-    if getter is not None:
-        function = getter(offset) or getter(offset & ~1)
-        name = getattr(function, "function_name", None) if function is not None else None
-        if name:
-            return str(name)
-    symbols = getattr(report, "function_symbols", None) or {}
-    return str(symbols.get(offset) or symbols.get(offset & ~1) or f"sub_{offset:x}")

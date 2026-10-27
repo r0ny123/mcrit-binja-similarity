@@ -12,6 +12,7 @@ from mcrit_similarity.config import (
     DEFAULT_SERVER,
     DEFAULT_TIMEOUT,
     GROUP,
+    NUMBER_RANGES,
     PROVIDER_SETTINGS_ID,
     ProviderConfig,
     config_from_values,
@@ -92,8 +93,8 @@ def register_global_settings() -> None:
             "title": "Request timeout",
             "type": "number",
             "default": DEFAULT_TIMEOUT,
-            "minValue": 1,
-            "maxValue": 3600,
+            "minValue": NUMBER_RANGES["timeout"][0],
+            "maxValue": NUMBER_RANGES["timeout"][1],
             "description": "HTTP timeout in seconds.",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
@@ -148,12 +149,6 @@ def default_provider_settings():
 
     settings = Settings(PROVIDER_SETTINGS_ID)
     settings.register_group(GROUP, _GROUP_TITLE)
-    number_ranges = {
-        "minhash_threshold": (0, 100),
-        "pichash_size": (0, 1000),
-        "band_matches_required": (1, 64),
-        "max_results": (1, 50),
-    }
     try:
         current_server = global_defaults().server
     except Exception:
@@ -168,8 +163,8 @@ def default_provider_settings():
             "description": description,
             "ignore": ["SettingsResourceScope"],
         }
-        if key in number_ranges:
-            properties["minValue"], properties["maxValue"] = number_ranges[key]
+        if key in NUMBER_RANGES:
+            properties["minValue"], properties["maxValue"] = NUMBER_RANGES[key]
         settings.register_setting(f"{GROUP}.{key}", json.dumps(properties))
     return settings
 
@@ -188,29 +183,7 @@ def _read_setting(settings, key: str, type_name: str, default):
 def config_from_settings(settings, defaults: ProviderConfig | None = None) -> ProviderConfig:
     base = defaults or global_defaults()
     values = {
-        "server": _read_setting(settings, "server", "string", "") or base.server,
-        "username": base.username,
-        "api_token": base.api_token,
-        "timeout": base.timeout,
-        "minhash_threshold": _read_setting(
-            settings, "minhash_threshold", "number", base.minhash_threshold
-        ),
-        "pichash_size": _read_setting(settings, "pichash_size", "number", base.pichash_size),
-        "band_matches_required": _read_setting(
-            settings, "band_matches_required", "number", base.band_matches_required
-        ),
-        "max_results": _read_setting(settings, "max_results", "number", base.max_results),
-        "include_library": _read_setting(
-            settings, "include_library", "boolean", base.include_library
-        ),
-        "persist_samples": _read_setting(
-            settings, "persist_samples", "boolean", base.persist_samples
-        ),
-        "apply_corpus_labels": _read_setting(
-            settings, "apply_corpus_labels", "boolean", base.apply_corpus_labels
-        ),
-        "query_per_node": _read_setting(settings, "query_per_node", "boolean", base.query_per_node),
-        "family": _read_setting(settings, "family", "string", base.family),
-        "version": _read_setting(settings, "version", "string", base.version),
+        key: _read_setting(settings, key, type_name, getattr(base, key))
+        for key, type_name, *_ in _PROVIDER_SCHEMA
     }
     return config_from_values(values, base)

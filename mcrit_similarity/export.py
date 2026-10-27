@@ -165,9 +165,7 @@ def _build_report(bv) -> object:
     filename = os.path.basename(bv.file.original_filename or bv.file.filename or "")
     if filename:
         report.filename = filename
-    sha256 = getattr(report, "sha256", None) or ""
-    functions = list(report.getFunctions()) if hasattr(report, "getFunctions") else []
-    log_debug(f"Exported SMDA report {sha256[:12]}… ({len(functions)} functions)")
+    log_debug(f"Exported SMDA report with {report.num_functions} functions")
     return report
 
 

@@ -45,15 +45,3 @@ def confidence_from_match(
     size = max(0.0, float(num_bytes))
     weight = 1.0 if size >= _CONFIDENCE_FULL_BYTES else size / _CONFIDENCE_FULL_BYTES
     return clamp_score(round(similarity * weight * uniqueness_weight(margin)))
-
-
-def is_pichash(flags: int) -> bool:
-    return bool(flags & IS_PICHASH_FLAG)
-
-
-def is_library(flags: int) -> bool:
-    return bool(flags & IS_LIBRARY_FLAG)
-
-
-def is_minhash(flags: int) -> bool:
-    return bool(flags & IS_MINHASH_FLAG)

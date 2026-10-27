@@ -18,33 +18,25 @@ def _bn_logger():
         return None
 
 
-def log_info(message: str) -> None:
+def _log(bn_method: str, level: int, message: str) -> None:
     logger = _bn_logger()
     if logger is not None:
-        logger.log_info(message)
+        getattr(logger, bn_method)(message)
     else:
-        _python_logger.info(message)
+        _python_logger.log(level, message)
+
+
+def log_info(message: str) -> None:
+    _log("log_info", logging.INFO, message)
 
 
 def log_warn(message: str) -> None:
-    logger = _bn_logger()
-    if logger is not None:
-        logger.log_warn(message)
-    else:
-        _python_logger.warning(message)
+    _log("log_warn", logging.WARNING, message)
 
 
 def log_error(message: str) -> None:
-    logger = _bn_logger()
-    if logger is not None:
-        logger.log_error(message)
-    else:
-        _python_logger.error(message)
+    _log("log_error", logging.ERROR, message)
 
 
 def log_debug(message: str) -> None:
-    logger = _bn_logger()
-    if logger is not None:
-        logger.log_debug(message)
-    else:
-        _python_logger.debug(message)
+    _log("log_debug", logging.DEBUG, message)

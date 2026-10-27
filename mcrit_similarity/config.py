@@ -11,6 +11,15 @@ DEFAULT_PICHASH_SIZE = 10
 DEFAULT_BAND_MATCHES = 2
 DEFAULT_MAX_RESULTS = 5
 
+# Inclusive (minimum, maximum) for each numeric setting, shared by parsing and the settings schema.
+NUMBER_RANGES = {
+    "timeout": (1, 3600),
+    "minhash_threshold": (0, 100),
+    "pichash_size": (0, 1000),
+    "band_matches_required": (1, 64),
+    "max_results": (1, 50),
+}
+
 GROUP = "mcrit_similarity"
 PROVIDER_SETTINGS_ID = "mcrit-similarity"
 
@@ -74,13 +83,10 @@ def config_from_values(
         server=server,
         username=_as_str(values.get("username"), base.username).strip(),
         api_token=_as_str(values.get("api_token"), base.api_token),
-        timeout=_as_int(values.get("timeout"), base.timeout, 1, 3600),
-        minhash_threshold=_as_int(values.get("minhash_threshold"), base.minhash_threshold, 0, 100),
-        pichash_size=_as_int(values.get("pichash_size"), base.pichash_size, 0, 1000),
-        band_matches_required=_as_int(
-            values.get("band_matches_required"), base.band_matches_required, 1, 64
-        ),
-        max_results=_as_int(values.get("max_results"), base.max_results, 1, 50),
+        **{
+            key: _as_int(values.get(key), getattr(base, key), *limits)
+            for key, limits in NUMBER_RANGES.items()
+        },
         include_library=_as_bool(values.get("include_library"), base.include_library),
         persist_samples=_as_bool(values.get("persist_samples"), base.persist_samples),
         apply_corpus_labels=_as_bool(values.get("apply_corpus_labels"), base.apply_corpus_labels),

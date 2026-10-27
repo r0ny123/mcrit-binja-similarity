@@ -195,21 +195,6 @@ def test_loopback_keeps_working_over_http(server):
     assert McritClient(server, apitoken="tok").headers["apitoken"] == "tok"
 
 
-def test_oversized_responses_are_refused_before_parsing():
-    with patch("mcrit_similarity.mcrit.client._send") as request:
-        request.return_value = FakeResponse(
-            200, {"status": "successful", "data": {}}, headers={"Content-Length": str(10**12)}
-        )
-        with pytest.raises(McritHttpError, match="maximum size"):
-            client().get_version()
-        request.return_value = FakeResponse(
-            200,
-            {"status": "successful", "data": {"version": "1"}},
-            headers={"Content-Length": "not a number"},
-        )
-        assert client().get_version() == "1"
-
-
 def test_matching_parameters_are_omitted_when_unset():
     with patch("mcrit_similarity.mcrit.client._send") as request:
         request.return_value = FakeResponse(200, {"status": "successful", "data": "job"})

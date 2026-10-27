@@ -93,4 +93,4 @@ REPORT_KEYS = LockedCache()
 # (server, sha256) -> SampleRef
 SAMPLES = LockedCache()
 # (server, function_id) -> (offset, corpus label)
-FUNCTION_OFFSETS = LockedCache()
+FUNCTION_OFFSETS = LockedCache(max_items=200_000)

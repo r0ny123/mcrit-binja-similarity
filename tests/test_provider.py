@@ -3,12 +3,16 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
 from binaryninja.similarity import SimilarityApplyStatus, SimilarityProvider
+from smda.common.SmdaReport import SmdaReport
 
 from mcrit_similarity.config import ProviderConfig
+from mcrit_similarity.errors import McritAuthError
 from mcrit_similarity.mapping import Entity
 from mcrit_similarity.mcrit.parse import FunctionMatch
-from mcrit_similarity.provider import McritProvider
+from mcrit_similarity.mcrit.samples import SampleRef
+from mcrit_similarity.provider import McritProvider, _function_name, _Stopped
 
 
 class FakeNode:
@@ -273,3 +277,39 @@ def test_apply_renames_unnamed_source_only_when_enabled(provider_type):
     assert _apply(provider_type, on, target_symbol=USER) == (ok, None)
     failed = SimilarityApplyStatus.SimilarityApplyFailed
     assert _apply(provider_type, on, base_status=failed) == (failed, None)
+
+
+def test_function_name_falls_back_to_the_default_name_for_a_real_report():
+    assert _function_name(SmdaReport(), 0x401000) == "sub_401000"
+
+
+def test_stop_after_a_failed_corpus_query_skips_the_vs_fallback(provider_type):
+    provider = McritProvider(provider_type, ProviderConfig(query_per_node=True))
+    with (
+        patch.object(provider, "_corpus_payload", return_value=None),
+        patch("mcrit_similarity.provider.match_sample_vs") as vs,
+        pytest.raises(_Stopped),
+    ):
+        provider._match_payload(
+            Mock(),
+            provider._config,
+            SampleRef(1, "a", True),
+            SampleRef(2, "b", True),
+            Mock(),
+            lambda: True,
+            None,
+        )
+    vs.assert_not_called()
+
+
+def test_a_real_failure_during_a_stop_is_still_logged_as_an_error(provider_type):
+    provider = McritProvider(provider_type, ProviderConfig())
+    with (
+        patch.object(provider, "_visit_edge", side_effect=McritAuthError("denied")),
+        patch("mcrit_similarity.provider.log_error") as log_error,
+        patch("mcrit_similarity.provider.log_info") as log_info,
+    ):
+        completion = FakeCompletion(stop=True)
+        assert provider.perform_visit_node_edge(Mock(), Mock(), Mock(), completion) is False
+    log_error.assert_called_once_with("denied")
+    log_info.assert_not_called()
