@@ -90,13 +90,13 @@ Per-session options live in the session's Configuration dialog: MinHash threshol
 
 ## How matching works
 
-Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by SHA256. An unknown sample is uploaded when *persist samples* is on (the log shows the upload and indexing time), otherwise the visit fails with a log message. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
+Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the SHA256 of that report. For PE files this is the hash of the mapped image SMDA exports, which can differ from the file's own SHA256, so a sample already on the server under its file hash is uploaded again as a separate sample. An unknown sample is uploaded when *persist samples* is on (the log shows the upload and indexing time), with no family unless you set one; on a shared server, turn it off or set *family* first. With it off, the visit fails with a log message instead. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
 
 Confidence reflects how unique a match is: a tie with another candidate halves it, a lead of 10+ points keeps it, and a PicHash match gets 255 only when no other function shares that PicHash. A result is named after the target's MCRIT function label when the target has no symbol, or `name (label)` when both differ.
 
 ## Diff rendering
 
-Rendering aligns the two functions by PicBlock hash, then pairs leftover blocks by escaped-instruction similarity. Inside paired blocks only differing instructions are marked changed; one-sided blocks are coloured removed (A) or added (B). Function entries always pair with each other, so a difference there is marked changed rather than painting the header as removed. Identical functions stay unpainted — a score of 100 alone does not mean identical, so those are diffed too.
+Rendering aligns the two functions by PicBlock hash, then pairs leftover blocks by escaped-instruction similarity. Inside paired blocks only differing instructions are marked changed; one-sided blocks are coloured removed (A) or added (B). Function entries always pair with each other, so a difference there is marked changed rather than painting the header as removed. Identical functions stay unpainted — a score of 100 alone does not mean identical, so those are diffed too. Changed lines are orange, removed red and added green, in the Graph and Linear tabs and in every view the selector offers: Disassembly, Low/Medium/High Level IL and the Pseudo C, Objective-C and Rust languages.
 
 SMDA reports are cached under `<Binary Ninja user folder>/mcrit_similarity/smda_reports` (512 MiB / 1000 files, least-recently-used removed). After a restart, sessions reuse them, and reports up to 64 MiB are reloaded in the background once analysis finishes. Delete the folder to clear the cache.
 
