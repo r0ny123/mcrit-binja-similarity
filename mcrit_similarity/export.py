@@ -11,7 +11,7 @@ from pathlib import Path
 
 from mcrit_similarity import diskcache
 from mcrit_similarity.architectures import SMDA_ARCHITECTURES, smda_architecture
-from mcrit_similarity.cache import REPORT_KEYS, REPORTS, LockedCache
+from mcrit_similarity.cache import REPORT_KEYS, REPORTS, SESSION_CACHE_ITEMS, LockedCache
 from mcrit_similarity.errors import McritJobError
 from mcrit_similarity.log import log_debug
 
@@ -24,15 +24,15 @@ _HASH_CHUNK = 16 * 1024 * 1024
 _COLD_MAX_RAW_BYTES = 4 * 1024 * 1024
 _COLD_MAX_STORED_BYTES = 768 * 1024
 # session_id -> sha256 of the file, or "" when it is too large to hash on the UI thread.
-_COLD_SHA256 = LockedCache()
+_COLD_SHA256 = LockedCache(max_items=SESSION_CACHE_ITEMS)
 # (session_id, raw length) -> sha256 of the file bytes. Raw bytes do not change while a file
 # stays open, so it is hashed once per process instead of on every export and preload.
-_RAW_SHA256 = LockedCache()
+_RAW_SHA256 = LockedCache(max_items=SESSION_CACHE_ITEMS)
 # (session_id, key) pairs whose report could not be loaded for the cold render path.
-_COLD_MISSES = LockedCache()
+_COLD_MISSES = LockedCache(max_items=SESSION_CACHE_ITEMS)
 # session_id -> key of its last export. A later export under another key means analysis
 # changed in this process, so the disk copy of the earlier analysis must not stand in.
-_EXPORTED_KEYS = LockedCache()
+_EXPORTED_KEYS = LockedCache(max_items=SESSION_CACHE_ITEMS)
 _DISK_FOLDER = LockedCache()
 
 

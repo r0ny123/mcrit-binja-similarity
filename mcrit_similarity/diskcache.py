@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import gc
 import gzip
+import io
 import json
 import os
 import re
@@ -76,10 +77,10 @@ def load(folder: Path, sha256: str) -> Any:
     try:
         with _gc_paused():
             with gzip.open(path, "rb") as handle:
-                document = json.loads(handle.read())
+                document = json.load(handle)
             if {k: document.get(k) for k in ("format", "smda", "sha256")} != _header(sha256):
                 raise ValueError("header does not match the requested file")
-            report = SmdaReport.fromDict(document["report"])
+            report = SmdaReport.fromDict(document.pop("report"))
     except FileNotFoundError:
         return None
     except Exception as exc:
@@ -95,18 +96,17 @@ def load(folder: Path, sha256: str) -> Any:
 
 def store(folder: Path, sha256: str, report: Any) -> None:
     path = report_path(folder, sha256)
-    document = _header(sha256)
-    document["report"] = report.toDict()
-    payload = json.dumps(document, separators=(",", ":")).encode()
+    document = {**_header(sha256), "report": report.toDict()}
     temp_name = None
     try:
         folder.mkdir(parents=True, exist_ok=True)
         fd, temp_name = tempfile.mkstemp(dir=folder, prefix=".", suffix=".tmp")
         with (
             os.fdopen(fd, "wb") as raw,
-            gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1) as out,
+            gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1) as compressed,
+            io.TextIOWrapper(compressed, encoding="utf-8") as out,
         ):
-            out.write(payload)
+            json.dump(document, out, separators=(",", ":"))
         # Same-directory rename is atomic, so readers see the old file or the whole new one.
         os.replace(temp_name, path)
         temp_name = None

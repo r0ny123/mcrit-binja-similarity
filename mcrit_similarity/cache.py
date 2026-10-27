@@ -120,7 +120,9 @@ class LockedCache:
 REPORTS = LockedCache(
     max_items=16, max_weight=5_000_000, weigh=lambda report: report.num_instructions
 )
+# Per-open-file entries are small, but headless runs over many files would otherwise keep all.
+SESSION_CACHE_ITEMS = 1024
 # Open file (FileMetadata.session_id) -> REPORTS key of the report exported for it.
-REPORT_KEYS = LockedCache()
+REPORT_KEYS = LockedCache(max_items=SESSION_CACHE_ITEMS)
 # (server, function_id) -> (offset, corpus label)
 FUNCTION_OFFSETS = LockedCache(max_items=200_000)
