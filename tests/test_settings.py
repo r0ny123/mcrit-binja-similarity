@@ -58,3 +58,13 @@ def test_token_stays_in_settings_without_a_keychain():
     settings = FakeSettings(**{KEY: "tok"})
     assert _migrate_token(settings, secrets(None)) == "tok"
     assert settings.values[KEY] == "tok"
+
+
+def test_warning_about_a_plaintext_token_is_logged_once(caplog):
+    from mcrit_similarity.settings import _warn_plaintext_token
+
+    _warn_plaintext_token.cache_clear()
+    with caplog.at_level("WARNING"):
+        for _ in range(3):
+            _migrate_token(FakeSettings(**{KEY: "tok"}), secrets(None))
+    assert caplog.text.count("No system keychain") == 1

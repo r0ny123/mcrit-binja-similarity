@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / "mcrit_similarity"
 FORBIDDEN = ("binaryninja", "binaryninjaui")
 ALLOWED_BN_FILES = {
+    "commands.py",
     "provider.py",
     "settings.py",
     "export.py",

@@ -37,7 +37,7 @@ This is a session provider for comparing binaries. For the MCRIT sidebar that br
 
 3. Restart Binary Ninja. The log shows `Registered MCRIT Binary Similarity provider`.
 
-4. Open Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity`, and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT API, or `https://<host>/api/` plus username and API token for mcritweb.
+4. Open Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity`, and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT API, or `https://<host>/api/` plus username and API token for mcritweb. Then run `Plugins > MCRIT Similarity > Test Server Connection`: it checks the URL and token without starting a session.
 
 ## Get an MCRIT server
 
@@ -88,9 +88,16 @@ Per-session options live in the session's Configuration dialog: MinHash threshol
 > [!NOTE]
 > The [MCRIT plugin](https://github.com/familiary/mcrit-plugin) (IDA/Binary Ninja/Ghidra) registers its settings as **MCRIT** under `mcrit`. This plugin's settings are a separate **MCRIT Binary Similarity** group, so both can be installed side by side and point at the same server.
 
+## Security
+
+- The API token is stored in the system keychain (the log warns when none is available and it stays in Binary Ninja's settings). It is never logged.
+- A token is only sent over HTTPS, or HTTP to a loopback address. Redirects are refused, so a token cannot be forwarded to another host.
+- Certificates are verified. For a private CA, set `REQUESTS_CA_BUNDLE` to its bundle before starting Binary Ninja.
+- Uploads are opt-in for remote servers (see *How matching works*).
+
 ## How matching works
 
-Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the SHA256 of that report. For PE files this is the hash of the mapped image SMDA exports, which can differ from the file's own SHA256, so a sample already on the server under its file hash is uploaded again as a separate sample. An unknown sample is uploaded when *persist samples* is on (the log shows the upload and indexing time), with no family unless you set one; on a shared server, turn it off or set *family* first. With it off, the visit fails with a log message instead. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
+Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the SHA256 of that report. For PE files this is the hash of the mapped image SMDA exports, which can differ from the file's own SHA256, so a sample already on the server under its file hash is uploaded again as a separate sample. An unknown sample is uploaded only when *persist samples* is on, with no family unless you set one. It is on by default for a local server and off for a remote one, because an upload sends the binary's disassembly to that server; turn it on per session when you mean to. With it off, the visit fails with a log message naming the server. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
 
 Confidence reflects how unique a match is: a tie with another candidate halves it, a lead of 10+ points keeps it, and a PicHash match gets 255 only when no other function shares that PicHash. A result is named after the target's MCRIT function label when the target has no symbol, or `name (label)` when both differ.
 
@@ -128,7 +135,7 @@ Binary Ninja's own [troubleshooting guide](https://docs.binary.ninja/guide/simil
 
 - **Log says `MCRIT Similarity requires Binary Ninja Ultimate 6.0+`** — Binary Similarity needs Ultimate; the plugin intentionally stays idle otherwise.
 - **No results / requests fail** — check the server URL: mcritweb wants the trailing `/api/`, the direct API does not. Raise *Request timeout* for slow uploads.
-- **`403` on upload** — mcritweb needs a contributor or admin token to persist samples. If both samples are already on the server, turning *persist samples* off also unblocks the session.
+- **`403`** — the API token is missing or wrong (`Test Server Connection` shows which), or, on upload, it lacks contributor or admin rights. If both samples are already on the server, turning *persist samples* off also unblocks the session.
 - **No matches between different architectures** — expected: MCRIT 1.13+ matches within one architecture only.
 - **Render warns `no SMDA report is cached` after a restart** — re-run the session; reports reload in the background once analysis finishes.
 - **Settings look duplicated** — that is the MCRIT disassembler plugin's own **MCRIT** group; this plugin's settings are under **MCRIT Binary Similarity**.

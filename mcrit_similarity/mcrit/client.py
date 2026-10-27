@@ -48,6 +48,10 @@ def _retry_delay(attempt: int) -> float:
     return random.uniform(0, min(_RETRY_MAX_DELAY, _RETRY_BASE_DELAY * 2 ** (attempt - 1)))
 
 
+def is_loopback(url: str) -> bool:
+    return urlparse(url).hostname in _LOOPBACK_HOSTS
+
+
 def _normalize_server(url: str) -> str:
     url = (url or "").strip()
     if not url:
@@ -67,7 +71,7 @@ class McritClient:
     ) -> None:
         self.mcrit_server = _normalize_server(mcrit_server)
         parsed = urlparse(self.mcrit_server)
-        if apitoken and parsed.scheme == "http" and parsed.hostname not in _LOOPBACK_HOSTS:
+        if apitoken and parsed.scheme == "http" and not is_loopback(self.mcrit_server):
             raise McritAuthError(
                 f"Cannot transmit API token over unencrypted HTTP to non-loopback host '{parsed.hostname}'. "
                 "Use HTTPS to protect credentials."
@@ -116,8 +120,8 @@ class McritClient:
         status = response.status_code
         if status in (401, 403):
             raise McritAuthError(
-                f"MCRIT rejected the request (HTTP {status}). "
-                "Persisting samples through mcritweb requires a contributor or admin token."
+                f"MCRIT rejected the request (HTTP {status}); check the API token. "
+                "Uploading samples through mcritweb requires a contributor or admin token."
             )
         if status in (301, 302, 303, 307, 308):
             raise McritHttpError(f"MCRIT server returned unexpected redirect HTTP {status}")

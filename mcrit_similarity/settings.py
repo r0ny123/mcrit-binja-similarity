@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 
 from mcrit_similarity.config import (
@@ -17,7 +18,8 @@ from mcrit_similarity.config import (
     ProviderConfig,
     config_from_values,
 )
-from mcrit_similarity.log import log_error
+from mcrit_similarity.log import log_error, log_warn
+from mcrit_similarity.mcrit.client import is_loopback
 
 SECRET_KEY = "api_token"
 KEYCHAIN_PROVIDER = "SystemSecretsProvider"
@@ -42,7 +44,7 @@ _PROVIDER_SCHEMA = (
         "persist_samples",
         "boolean",
         True,
-        "Upload missing samples so MatcherVs can run. Required unless both SHA256s are already on the server.",
+        "Upload missing samples so MatcherVs can run; an upload sends the binary's disassembly to the server. On by default for a local server, off for a remote one. Required unless both SHA256s are already on the server.",
     ),
     (
         "apply_corpus_labels",
@@ -105,6 +107,13 @@ def register_global_settings() -> None:
     _migrate_token(settings, SecretsProvider)
 
 
+@functools.cache
+def _warn_plaintext_token() -> None:
+    log_warn(
+        "No system keychain is available; the MCRIT API token stays in Binary Ninja's settings"
+    )
+
+
 def _migrate_token(settings, secrets_provider_cls) -> str:
     # An empty field is indistinguishable from the default Binary Ninja reports after the token
     # has been moved to the keychain, so it must never be read as a request to delete the token.
@@ -114,6 +123,8 @@ def _migrate_token(settings, secrets_provider_cls) -> str:
     if typed:
         if provider is not None and provider.store_data(full_key, typed):
             settings.reset(full_key)
+        else:
+            _warn_plaintext_token()
         return typed
     if provider is not None and provider.has_data(full_key):
         return provider.get_data(full_key)
@@ -154,8 +165,9 @@ def default_provider_settings():
     except Exception:
         current_server = DEFAULT_SERVER
 
+    dynamic_defaults = {"server": current_server, "persist_samples": is_loopback(current_server)}
     for key, type_name, default, description in _PROVIDER_SCHEMA:
-        eff_default = current_server if key == "server" else default
+        eff_default = dynamic_defaults.get(key, default)
         properties = {
             "title": key.replace("_", " ").title(),
             "type": type_name,

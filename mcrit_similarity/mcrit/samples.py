@@ -135,7 +135,7 @@ def ensure_sample(
         return _existing_sample(client, existing, sha256, should_stop, on_progress)
     if not persist:
         raise McritError(
-            f"Sample {sha256[:12]}… is not on the MCRIT server; enable Persist samples "
+            f"Sample {sha256[:12]}… is not on the MCRIT server {client.mcrit_server}; enable Persist samples "
             "in the MCRIT provider settings to upload it"
         )
 

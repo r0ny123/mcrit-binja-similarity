@@ -6,8 +6,9 @@ __all__ = ["__version__"]
 
 
 def _register() -> None:
-    from binaryninja import BinaryViewType, core_product
+    from binaryninja import BinaryViewType, PluginCommand, core_product
 
+    from mcrit_similarity.commands import COMMAND_NAME, run_connection_check
     from mcrit_similarity.log import log_info
     from mcrit_similarity.settings import register_global_settings
 
@@ -21,6 +22,9 @@ def _register() -> None:
 
     McritProviderType().register()
     BinaryViewType.add_binaryview_initial_analysis_completion_event(_preload_in_background)
+    PluginCommand.register(
+        COMMAND_NAME, "Check the MCRIT server URL and API token", run_connection_check
+    )
     log_info("Registered MCRIT Binary Similarity provider")
 
 

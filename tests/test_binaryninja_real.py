@@ -132,3 +132,10 @@ def test_mid_size_functions_keep_the_instruction_level_diff(views):
     annotation_blocks(source, target)
     elapsed = time.perf_counter() - start
     assert elapsed < 3.0, f"aligning _inflate took {elapsed:.2f}s"
+
+
+@ultimate
+def test_connection_check_command_is_registered():
+    from mcrit_similarity.commands import COMMAND_NAME
+
+    assert COMMAND_NAME in {command.name for command in bn.PluginCommand}
