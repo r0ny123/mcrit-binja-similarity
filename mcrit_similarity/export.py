@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
 from mcrit_similarity import diskcache
-from mcrit_similarity.architectures import smda_architecture
+from mcrit_similarity.architectures import SMDA_ARCHITECTURES, smda_architecture
 from mcrit_similarity.cache import REPORT_KEYS, REPORTS, LockedCache
 from mcrit_similarity.errors import McritJobError
 from mcrit_similarity.log import log_debug
@@ -76,7 +77,7 @@ def _cold_sha256(bv) -> str:
     raw = bv.file.raw
     if raw is None or not 0 < raw.length <= _COLD_MAX_RAW_BYTES:
         return ""
-    return _raw_sha256(raw)
+    return _raw_sha256_cached(bv)
 
 
 def cached_report(bv) -> object | None:
@@ -105,15 +106,31 @@ def cached_report(bv) -> object | None:
 _PRELOAD_MAX_RAW_BYTES = 64 * 1024 * 1024
 
 
-def _warm_architecture(bv) -> None:
+# Opening a project analyses many files at once; their preloads run one at a time.
+_PRELOAD_LOCK = threading.Lock()
+
+
+def _warm_architecture(bv) -> str | None:
     # Binary Ninja builds its Python Architecture wrapper (~150-250 ms) on first use and caches it
     # process-wide. Exporting used to pay this; with stored reports it would land on the UI thread.
-    _ = bv.arch
+    arch = bv.arch
+    return arch.name if arch is not None else None
 
 
 def preload_report(bv) -> None:
     """Load a stored report for a freshly analysed view so its first render needs no disk I/O."""
-    _warm_architecture(bv)
+    with _PRELOAD_LOCK:
+        try:
+            _preload(bv)
+        except Exception as exc:
+            # Best effort: the view may have been closed while this waited for its turn.
+            log_debug(f"MCRIT preload skipped: {exc}")
+
+
+def _preload(bv) -> None:
+    arch_name = _warm_architecture(bv)
+    if arch_name is not None and arch_name not in SMDA_ARCHITECTURES:
+        return
     raw = bv.file.raw
     if bv.view_type == "Raw" or raw is None or not 0 < raw.length <= _PRELOAD_MAX_RAW_BYTES:
         return

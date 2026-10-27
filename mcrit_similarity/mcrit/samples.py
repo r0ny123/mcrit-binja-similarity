@@ -149,10 +149,8 @@ def ensure_sample(
         )
 
     # Reports are cached and shared across sessions, so labels are applied at upload time.
-    if family:
-        smda_report.family = family
-    if version:
-        smda_report.version = version
+    smda_report.family = family
+    smda_report.version = version
     filename = getattr(smda_report, "filename", "") or "sample"
     count = getattr(smda_report, "num_functions", "?")
     log_warn(

@@ -119,7 +119,7 @@ def _migrate_token(settings, secrets_provider_cls) -> str:
     # has been moved to the keychain, so it must never be read as a request to delete the token.
     full_key = f"{GROUP}.{SECRET_KEY}"
     provider = secrets_provider_cls.get(KEYCHAIN_PROVIDER)
-    typed = settings.get_string(full_key)
+    typed = settings.get_string(full_key).strip()
     if typed:
         if provider is not None and provider.store_data(full_key, typed):
             settings.reset(full_key)

@@ -13,6 +13,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -44,19 +45,41 @@ def _header(sha256: str) -> dict:
     return {"format": FORMAT_VERSION, "smda": _smda_version(), "sha256": sha256}
 
 
+_gc_lock = threading.Lock()
+_gc_pausers = 0
+_gc_resume = False
+
+
+@contextlib.contextmanager
+def _gc_paused():
+    """Pause cyclic GC for the duration; it resumes when the last overlapping caller leaves."""
+    global _gc_pausers, _gc_resume
+    with _gc_lock:
+        if _gc_pausers == 0:
+            _gc_resume = gc.isenabled()
+            gc.disable()
+        _gc_pausers += 1
+    try:
+        yield
+    finally:
+        with _gc_lock:
+            _gc_pausers -= 1
+            if _gc_pausers == 0 and _gc_resume:
+                gc.enable()
+
+
 def load(folder: Path, sha256: str) -> Any:
     path = report_path(folder, sha256)
     from smda.common.SmdaReport import SmdaReport
 
     # fromDict allocates objects per instruction; cyclic GC passes during it double the load time.
-    gc_was_enabled = gc.isenabled()
-    gc.disable()
     try:
-        with gzip.open(path, "rb") as handle:
-            document = json.loads(handle.read())
-        if {k: document.get(k) for k in ("format", "smda", "sha256")} != _header(sha256):
-            raise ValueError("header does not match the requested file")
-        report = SmdaReport.fromDict(document["report"])
+        with _gc_paused():
+            with gzip.open(path, "rb") as handle:
+                document = json.loads(handle.read())
+            if {k: document.get(k) for k in ("format", "smda", "sha256")} != _header(sha256):
+                raise ValueError("header does not match the requested file")
+            report = SmdaReport.fromDict(document["report"])
     except FileNotFoundError:
         return None
     except Exception as exc:
@@ -64,9 +87,6 @@ def load(folder: Path, sha256: str) -> Any:
         log_warn(f"MCRIT: discarding unreadable cached SMDA report {path.name}: {exc}")
         _unlink(path)
         return None
-    finally:
-        if gc_was_enabled:
-            gc.enable()
     with contextlib.suppress(OSError):
         os.utime(path)
     log_debug(f"Loaded cached SMDA report {path.name}")

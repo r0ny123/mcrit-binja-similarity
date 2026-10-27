@@ -40,6 +40,8 @@ def _send(method: str, url: str, **kwargs: Any) -> requests.Response:
     session = getattr(_LOCAL, "session", None)
     if session is None:
         session = _LOCAL.session = requests.Session()
+    # Authentication is by header only; a cookie set for one server or token must not follow the next.
+    session.cookies.clear()
     return session.request(method, url, **kwargs)
 
 
@@ -71,6 +73,10 @@ class McritClient:
     ) -> None:
         self.mcrit_server = _normalize_server(mcrit_server)
         parsed = urlparse(self.mcrit_server)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise McritUnavailableError(
+                f"MCRIT server URL must start with http:// or https://, got {mcrit_server!r}"
+            )
         if parsed.username or parsed.password:
             raise McritAuthError(
                 "Do not put credentials in the server URL; use the Username and API token settings."
@@ -139,7 +145,7 @@ class McritClient:
                     error_detail = body.get("message") or body.get("error") or str(body)
             except Exception:
                 error_detail = getattr(response, "text", None) or error_detail
-            raise McritHttpError(f"MCRIT rejected request (HTTP 400): {error_detail}")
+            raise McritHttpError(f"MCRIT rejected request (HTTP 400): {str(error_detail)[:500]}")
         if status >= 500:
             raise McritHttpError(f"MCRIT server error HTTP {status}")
         if status not in (200, 202):

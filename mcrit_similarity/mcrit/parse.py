@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
@@ -87,7 +88,7 @@ def parse_vs_result(
                 matched_family = int(raw[0])
             except (TypeError, ValueError, OverflowError):
                 continue
-            if score < min_score:
+            if not math.isfinite(score) or score < min_score:
                 continue
             if target_sample_id is not None and matched_sample != target_sample_id:
                 continue

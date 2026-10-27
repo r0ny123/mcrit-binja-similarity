@@ -256,3 +256,10 @@ def test_a_terminated_index_job_is_reported(caplog):
     with caplog.at_level(logging.WARNING):
         assert pending_index_job(client, 7) is None
     assert "failed to index sample 7" in caplog.text
+
+
+def test_blank_labels_clear_ones_left_on_a_shared_report():
+    report = Report("ab")
+    report.family, report.version = "emotet", "v2"
+    ensure_sample(FakeClient(), report, persist=True)
+    assert (report.family, report.version) == ("", "")

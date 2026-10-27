@@ -308,3 +308,23 @@ def test_export_and_preload_warm_the_architecture(monkeypatch, tmp_path):
     export.export_smda_report(_ArchView(b"warm-export", session_id=9711))
     export.preload_report(_ArchView(b"warm-preload", session_id=9712))
     assert touched == [9711, 9712]
+
+
+def test_preload_skips_unsupported_architectures_without_hashing(monkeypatch, tmp_path):
+    class _MipsView(_PreloadView):
+        arch = SimpleNamespace(name="mipsel32")
+
+    hashed = []
+    monkeypatch.setattr(export, "_disk_folder", lambda: tmp_path)
+    monkeypatch.setattr(export, "_raw_sha256", lambda raw: hashed.append(1) or "")
+    export.preload_report(_MipsView(b"mips", session_id=9721))
+    assert hashed == []
+
+
+def test_preload_failures_on_a_closing_view_stay_quiet(monkeypatch, tmp_path):
+    def closed(raw):
+        raise RuntimeError("file closed")
+
+    monkeypatch.setattr(export, "_disk_folder", lambda: tmp_path)
+    monkeypatch.setattr(export, "_raw_sha256", closed)
+    export.preload_report(_PreloadView(b"closing", session_id=9722))

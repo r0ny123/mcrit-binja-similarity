@@ -215,3 +215,17 @@ def test_add_report_requires_sample_info():
         request.return_value = FakeResponse(200, {"status": "successful", "data": {"job_id": "j"}})
         with pytest.raises(McritHttpError, match="sample_info"):
             client().add_report({})
+
+
+@pytest.mark.parametrize("server", ["remote.example:8000", "localhost:8000", "ftp://h/", "http://"])
+def test_a_server_url_needs_an_http_scheme_and_host(server):
+    with pytest.raises(McritUnavailableError, match="http"):
+        McritClient(server, apitoken="tok")
+
+
+def test_a_long_bad_request_body_is_truncated():
+    with patch("mcrit_similarity.mcrit.client._send") as request:
+        request.return_value = FakeResponse(400, None, text="x" * 5000)
+        with pytest.raises(McritHttpError) as caught:
+            client().get_version()
+    assert len(str(caught.value)) < 600

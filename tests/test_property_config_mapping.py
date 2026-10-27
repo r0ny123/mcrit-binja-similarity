@@ -234,8 +234,8 @@ def test_migration_never_deletes_a_stored_token(typed, has_stored, store_ok):
     )
     token = _migrate_token(FakeSettings(typed), secrets(keychain))
     assert keychain.deletes == 0
-    if typed:
-        assert token == typed
+    if typed.strip():
+        assert token == typed.strip()
     elif has_stored:
         assert token == "stored"
         assert keychain.data["mcrit_similarity.api_token"] == "stored"

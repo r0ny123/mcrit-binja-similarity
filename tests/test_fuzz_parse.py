@@ -165,23 +165,18 @@ def test_non_finite_numbers_are_dropped_not_raised():
         row = [1, 2, 3, 50.0, 1]
         row[index] = inf
         assert parse_row(row) == [], f"index {index} must drop the row"
-    assert math.isinf(parse_row([1, 2, 3, inf, 1])[0].score)
+    assert parse_row([1, 2, 3, inf, 1]) == []
     assert parse_row([1, 2, 3, 50.0, inf])[0].flags == 0
     assert decode_offset(inf) is None
     assert target_functions({1: {"offset": inf}}) == {}
 
 
-def test_nan_score_survives_to_a_zero_similarity():
+def test_nan_score_is_dropped_at_parse_time():
     payload = json.loads(
         '{"matches": {"functions": [{"offset": 4096, "fid": 1, "num_bytes": 64,'
         ' "matches": [[0, 1, 2, NaN, 1]]}]}}'
     )
-    from mcrit_similarity.scoring import confidence_from_match, similarity_from_minhash
-
-    (match,) = parse_vs_result(payload)
-    assert math.isnan(match.score)
-    assert similarity_from_minhash(match.score) == 0
-    assert confidence_from_match(match.score, match.flags, match.num_bytes) == 0
+    assert parse_vs_result(payload) == []
 
 
 def test_missing_and_extra_fields_are_tolerated():

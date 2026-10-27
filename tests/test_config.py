@@ -23,3 +23,7 @@ def test_defaults_and_clamping():
     assert tight.include_library is False
     assert tight.persist_samples is False
     assert tight.apply_corpus_labels is True
+
+
+def test_api_token_is_stripped():
+    assert config_from_values({"api_token": " tok\n"}).api_token == "tok"

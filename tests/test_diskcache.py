@@ -156,3 +156,11 @@ def test_load_restores_gc_state(folder):
     diskcache.report_path(folder, report.sha256).write_bytes(b"bad")
     assert diskcache.load(folder, report.sha256) is None
     assert gc.isenabled()
+
+
+def test_overlapping_loads_keep_gc_paused_until_the_last_one_ends():
+    with diskcache._gc_paused():
+        with diskcache._gc_paused():
+            assert not gc.isenabled()
+        assert not gc.isenabled()
+    assert gc.isenabled()

@@ -87,6 +87,8 @@ class LockedCache:
                     return self._items[key]
                 event = self._inflight.get(key)
                 if event is None:
+                    if should_stop is not None and should_stop():
+                        raise McritJobError("MCRIT visit cancelled")
                     event = threading.Event()
                     self._inflight[key] = event
                     break

@@ -142,3 +142,38 @@ def test_weighing_happens_outside_the_cache_lock():
 
     threading.Thread(target=store, daemon=True).start()
     assert finished.wait(2), "weigh ran while the cache lock was held"
+
+
+def test_waiter_does_not_start_a_new_build_after_stop_is_requested():
+    import threading
+
+    import pytest
+
+    from mcrit_similarity.errors import McritJobError
+
+    cache = LockedCache()
+    started, release = threading.Event(), threading.Event()
+    stop = threading.Event()
+    builds = []
+
+    def failing():
+        started.set()
+        release.wait(5)
+        raise RuntimeError("boom")
+
+    def waiter():
+        with pytest.raises(McritJobError, match="cancelled"):
+            cache.get_or_set("k", lambda: builds.append(1), should_stop=stop.is_set)
+
+    builder = threading.Thread(
+        target=lambda: pytest.raises(RuntimeError, cache.get_or_set, "k", failing)
+    )
+    builder.start()
+    started.wait(5)
+    thread = threading.Thread(target=waiter)
+    thread.start()
+    stop.set()
+    release.set()
+    builder.join(5)
+    thread.join(5)
+    assert builds == []

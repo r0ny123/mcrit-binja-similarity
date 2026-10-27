@@ -82,7 +82,7 @@ def config_from_values(
     return ProviderConfig(
         server=server,
         username=_as_str(values.get("username"), base.username).strip(),
-        api_token=_as_str(values.get("api_token"), base.api_token),
+        api_token=_as_str(values.get("api_token"), base.api_token).strip(),
         **{
             key: _as_int(values.get(key), getattr(base, key), *limits)
             for key, limits in NUMBER_RANGES.items()

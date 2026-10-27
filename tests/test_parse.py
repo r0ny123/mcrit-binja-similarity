@@ -154,3 +154,11 @@ def test_applied_overrides_tolerates_servers_that_do_not_report_them():
         _applied_payload({}),
     ):
         assert applied_overrides(payload, requested) == {}
+
+
+def test_non_finite_scores_are_dropped():
+    matches = parse_vs_result(
+        _payload([0, 1, 20, float("nan"), 1], [0, 1, 21, float("inf"), 1], [0, 1, 22, 70.0, 1]),
+        min_score=50,
+    )
+    assert [match.target_function_id for match in matches] == [22]
