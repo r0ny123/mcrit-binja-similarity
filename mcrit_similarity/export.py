@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from mcrit_similarity import diskcache
-from mcrit_similarity.backend import BinjaSmdaInterface
+from mcrit_similarity.architectures import smda_architecture
 from mcrit_similarity.cache import REPORT_KEYS, REPORTS, LockedCache
 from mcrit_similarity.errors import McritJobError
 from mcrit_similarity.log import log_debug
@@ -147,21 +147,14 @@ def _load_small(key: tuple[str, int]) -> object | None:
 
 
 def _build_report(bv) -> object:
-    from smda.Disassembler import Disassembler
-    from smda.ida.IdaExporter import IdaExporter
+    from smda.binja.BinjaExporter import exportBinaryView
 
+    # SMDA raises a bare ValueError for other architectures.
+    smda_architecture(bv.arch.name)
     # Capstone often cannot decode a few malware bytes; that is a skip, not a failed export.
-    logging.getLogger("smda.ida.IdaExporter").setLevel(logging.ERROR)
+    logging.getLogger("smda.export.Exporter").setLevel(logging.ERROR)
 
-    interface = BinjaSmdaInterface(bv)
-    disassembler = Disassembler()
-    disassembler.setExporter(IdaExporter(disassembler.config, ida_interface=interface))
-    report = disassembler.disassembleBuffer(
-        interface.getBinary(),
-        interface.getBaseAddr(),
-        bitness=interface.getBitness(),
-        architecture=interface.getArchitecture(),
-    )
+    report = exportBinaryView(bv)
     filename = os.path.basename(bv.file.original_filename or bv.file.filename or "")
     if filename:
         report.filename = filename

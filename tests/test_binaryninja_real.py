@@ -32,20 +32,6 @@ def _instructions(block):
     return found
 
 
-def test_block_decoding_matches_binary_ninja(views):
-    from mcrit_similarity.backend import BinjaSmdaInterface
-
-    for view in views:
-        interface = BinjaSmdaInterface(view)
-        for function in view.functions:
-            for block in function.basic_blocks:
-                decoded = [
-                    (addr, interface.getInstructionBytes(addr))
-                    for addr in interface._instruction_addresses(block)
-                ]
-                assert decoded == _instructions(block), hex(block.start)
-
-
 def test_export_produces_the_analysed_functions(views):
     from mcrit_similarity.export import export_smda_report
 

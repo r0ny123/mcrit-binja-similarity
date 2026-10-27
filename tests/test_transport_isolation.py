@@ -10,7 +10,6 @@ ALLOWED_BN_FILES = {
     "settings.py",
     "export.py",
     "render.py",
-    "backend.py",
     "log.py",
 }
 

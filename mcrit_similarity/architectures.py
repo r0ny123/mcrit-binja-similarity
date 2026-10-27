@@ -1,7 +1,7 @@
 """SMDA architecture names Binary Ninja can actually export.
 
-IdaExporter only initializes Capstone for ``intel`` and ``aarch64``. Mapping other
-BN arches would produce empty or corrupt reports, so they are rejected.
+SMDA's Binary Ninja exporter only initializes Capstone for ``intel`` and ``aarch64``. Other
+BN arches are rejected up front with a plugin error instead of SMDA's bare ``ValueError``.
 """
 
 from mcrit_similarity.errors import UnsupportedArchitectureError
