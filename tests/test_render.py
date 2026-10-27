@@ -59,7 +59,7 @@ def test_report_for_view_follows_the_open_file_not_the_wrapper():
     """Binary Ninja hands out a new wrapper per access; the open file's session id is stable."""
     assert _report_for_view(FakeView(session_id=101)) is None
 
-    report_obj = object()
+    report_obj = Mock(num_instructions=1)
     REPORTS.set(("digest-101", 5), report_obj)
     REPORT_KEYS.set(101, ("digest-101", 5))
     assert _report_for_view(FakeView(session_id=101)) is report_obj

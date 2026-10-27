@@ -1,11 +1,20 @@
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 from smda.Disassembler import Disassembler
 
 from mcrit_similarity import diskcache, export
-from mcrit_similarity.cache import REPORT_KEYS, REPORTS
+from mcrit_similarity.cache import REPORT_KEYS, REPORTS, LockedCache
+
+
+def _function(start):
+    return SimpleNamespace(start=start)
+
+
+def _fake_report():
+    return SimpleNamespace(num_instructions=1, num_functions=2)
 
 
 class _Raw:
@@ -27,18 +36,21 @@ class _View:
     def __init__(self, data: bytes | None, session_id: int):
         raw = _Raw(data) if data is not None else None
         self.file = type("File", (), {"raw": raw, "session_id": session_id})()
-        self.functions = [0]
+        self.functions = [_function(0)]
         self.analysis_runs = 0
+
+    def get_sections_at(self, address):
+        return []
 
     def update_analysis_and_wait(self):
         self.analysis_runs += 1
         if self.analysis_runs == 1:
-            self.functions.append(1)
+            self.functions.append(_function(1))
 
 
 def test_key_names_the_analysed_function_set(monkeypatch):
     builds = []
-    monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or object())
+    monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or _fake_report())
     view = _View(b"analysed-set", session_id=201)
     first = export.export_smda_report(view)
     second = export.export_smda_report(view)
@@ -48,7 +60,7 @@ def test_key_names_the_analysed_function_set(monkeypatch):
 
 
 def test_view_without_file_data_is_never_cached(monkeypatch):
-    monkeypatch.setattr(export, "_build_report", lambda bv: object())
+    monkeypatch.setattr(export, "_build_report", lambda bv: _fake_report())
     view = _View(None, session_id=202)
     assert export._view_cache_key(view) is None
     assert export.export_smda_report(view) is not export.export_smda_report(view)
@@ -62,8 +74,48 @@ def test_hash_spans_chunks(monkeypatch):
     assert export._view_cache_key(_View(b"abcdefgh", session_id=204)) == whole
 
 
-def test_report_cache_is_bounded():
-    assert REPORTS._max_items is not None
+def test_report_cache_is_bounded_by_instruction_count():
+    cache = LockedCache(
+        max_items=REPORTS._max_items, max_weight=REPORTS._max_weight, weigh=REPORTS._weigh
+    )
+    heavy = [SimpleNamespace(num_instructions=REPORTS._max_weight) for _ in range(2)]
+    cache.set("first", heavy[0])
+    cache.set("second", heavy[1])
+    assert cache.get("first") is None
+    assert cache.get("second") is heavy[1]
+
+
+@pytest.mark.parametrize(
+    "functions, imports, stored, changed",
+    [
+        (1000, 0, 980, False),
+        (1000, 0, 979, True),
+        (100, 0, 92, False),
+        (100, 0, 91, True),
+        (100, 30, 70, False),
+        (100, 30, 60, True),
+    ],
+)
+def test_analysis_changed_tolerates_small_gaps_and_ignores_import_stubs(
+    functions, imports, stored, changed
+):
+    stub = SimpleNamespace(name=".extern")
+    view = _View(b"counted", session_id=350)
+    view.functions = [_function(i) for i in range(functions)]
+    setattr(view, "get_sections_at", lambda address: [stub] if address < imports else [])
+    report = SimpleNamespace(num_functions=stored)
+    assert export._analysis_changed(report, view) is changed
+
+
+def test_stored_report_with_a_different_function_set_is_rebuilt(folder, monkeypatch):
+    builds = []
+    monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or _tiny_report())
+    export.export_smda_report(_View(b"drifted", session_id=361))
+    _forget(REPORT_KEYS.get(361))
+    view = _View(b"drifted", session_id=362)
+    view.functions = [_function(i) for i in range(60)]
+    export.export_smda_report(view)
+    assert len(builds) == 2
 
 
 @pytest.fixture
@@ -105,7 +157,7 @@ def test_cold_render_loads_from_disk(folder, monkeypatch):
     _forget(key)
 
     view = _View(b"cold-render", session_id=312)
-    view.functions.append(1)
+    view.functions.append(_function(1))
     _no_analysis(view)
     monkeypatch.setattr(export, "_build_report", None)
     report = export.cached_report(view)
@@ -121,7 +173,7 @@ def test_cold_render_reuses_report_in_memory(folder, monkeypatch):
     loads = []
     monkeypatch.setattr(diskcache, "load", lambda *a: loads.append(a))
     view = _View(b"reopened", session_id=322)
-    view.functions.append(1)
+    view.functions.append(_function(1))
     assert export.cached_report(view) is first
     assert loads == []
 
@@ -144,7 +196,7 @@ def test_cold_render_skips_large_stored_reports(folder, monkeypatch):
     _forget(key)
     monkeypatch.setattr(export, "_COLD_MAX_STORED_BYTES", 10)
     view = _View(b"big report", session_id=342)
-    view.functions.append(1)
+    view.functions.append(_function(1))
     assert export.cached_report(view) is None
     assert REPORT_KEYS.get(342) is None
 
@@ -154,14 +206,14 @@ def test_cold_render_memoizes_hash_and_misses(folder, monkeypatch):
     real_hash = export._raw_sha256
     monkeypatch.setattr(export, "_raw_sha256", lambda raw: hashes.append(1) or real_hash(raw))
     loads = []
-    monkeypatch.setattr(export, "_load_small", lambda key: loads.append(key))
+    monkeypatch.setattr(export, "_load_small", lambda bv, key: loads.append(key))
     view = _View(b"never exported", session_id=351)
     assert export.cached_report(view) is None
     assert export.cached_report(view) is None
     assert len(hashes) == 1
     assert len(loads) == 1
     # Analysis finding more functions changes the key, so the lookup is retried once.
-    view.functions.append(1)
+    view.functions.append(_function(1))
     assert export.cached_report(view) is None
     assert export.cached_report(view) is None
     assert len(hashes) == 1
@@ -180,7 +232,7 @@ def test_restart_with_other_function_count_uses_disk(folder, monkeypatch):
     monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or _tiny_report())
     export.export_smda_report(_View(b"recount", session_id=371))
     view = _View(b"recount", session_id=372)
-    view.functions.extend([2, 3])
+    view.functions.extend([_function(2), _function(3)])
     export.export_smda_report(view)
     assert len(builds) == 1
     assert REPORT_KEYS.get(372)[1] == 4
@@ -193,7 +245,7 @@ def test_analysis_change_in_process_rebuilds_and_rewrites(folder, monkeypatch):
     export.export_smda_report(view)
     path = diskcache.report_path(folder, REPORT_KEYS.get(381)[0])
     os.utime(path, (0, 0))
-    view.functions.append(2)
+    view.functions.append(_function(2))
     export.export_smda_report(view)
     assert len(builds) == 2
     assert path.stat().st_mtime > 0
@@ -202,7 +254,7 @@ def test_analysis_change_in_process_rebuilds_and_rewrites(folder, monkeypatch):
 def test_disk_cache_disabled_without_user_directory(monkeypatch):
     monkeypatch.delattr(sys.modules["binaryninja"], "user_directory", raising=False)
     builds = []
-    monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or object())
+    monkeypatch.setattr(export, "_build_report", lambda bv: builds.append(bv) or _fake_report())
     assert export._resolve_disk_folder() is None
     assert export._disk_folder() is None
     export.export_smda_report(_View(b"stub has no user dir", session_id=391))
@@ -221,7 +273,7 @@ class _PreloadView(_View):
 
 
 def test_preload_fills_the_render_lookup_from_disk(monkeypatch, tmp_path):
-    stored = object()
+    stored = _fake_report()
     monkeypatch.setattr(export, "_disk_folder", lambda: tmp_path)
     monkeypatch.setattr(export.diskcache, "load", lambda folder, sha256: stored)
     view = _PreloadView(b"preload-me", session_id=9701)
@@ -238,7 +290,7 @@ def test_preload_skips_raw_views_and_missing_reports(monkeypatch, tmp_path):
 
     raw_view = _PreloadView(b"raw", session_id=9703)
     raw_view.view_type = "Raw"
-    monkeypatch.setattr(export.diskcache, "load", lambda folder, sha256: object())
+    monkeypatch.setattr(export.diskcache, "load", lambda folder, sha256: _fake_report())
     export.preload_report(raw_view)
     assert REPORT_KEYS.get(9703) is None
 
@@ -251,7 +303,7 @@ def test_export_and_preload_warm_the_architecture(monkeypatch, tmp_path):
         def arch(self):
             touched.append(self.file.session_id)
 
-    monkeypatch.setattr(export, "_build_report", lambda bv: object())
+    monkeypatch.setattr(export, "_build_report", lambda bv: _fake_report())
     monkeypatch.setattr(export, "_disk_folder", lambda: None)
     export.export_smda_report(_ArchView(b"warm-export", session_id=9711))
     export.preload_report(_ArchView(b"warm-preload", session_id=9712))

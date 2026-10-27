@@ -229,3 +229,30 @@ def test_upload_race_with_existing_sample_checks_indexing():
     ref = ensure_sample(client, Report("cc"), persist=True)
     assert (ref.sample_id, ref.existed) == (7, True)
     assert client.polled == ["mine"]
+
+
+def test_a_failed_index_job_is_reported(caplog):
+    client = FakeClient()
+    client.queue = [_index_job("failed", 7, "queued") | {"attempts_left": 0}]
+    with caplog.at_level(logging.WARNING):
+        assert pending_index_job(client, 7) is None
+    assert "failed to index sample 7" in caplog.text
+
+
+def test_a_failed_index_job_is_not_reported_once_a_later_one_finished(caplog):
+    client = FakeClient()
+    client.queue = [
+        _index_job("failed", 7, "queued") | {"attempts_left": 0},
+        _index_job("done", 7, "finished"),
+    ]
+    with caplog.at_level(logging.WARNING):
+        assert pending_index_job(client, 7) is None
+    assert "failed to index" not in caplog.text
+
+
+def test_a_terminated_index_job_is_reported(caplog):
+    client = FakeClient()
+    client.queue = [_index_job("cancelled", 7, "queued") | {"terminated": True}]
+    with caplog.at_level(logging.WARNING):
+        assert pending_index_job(client, 7) is None
+    assert "failed to index sample 7" in caplog.text

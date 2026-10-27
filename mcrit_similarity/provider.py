@@ -19,7 +19,7 @@ from binaryninja.similarity import (
 )
 
 from mcrit_similarity import PROVIDER_NAME
-from mcrit_similarity.cache import FUNCTION_OFFSETS, SAMPLES, LockedCache
+from mcrit_similarity.cache import FUNCTION_OFFSETS, LockedCache
 from mcrit_similarity.config import ProviderConfig
 from mcrit_similarity.errors import McritError, McritJobError
 from mcrit_similarity.export import export_smda_report
@@ -158,9 +158,18 @@ class McritProvider(SimilarityProvider):
     def __init__(self, provider_type: McritProviderType, config: ProviderConfig):
         super().__init__(provider_type=provider_type)
         self._lock = threading.Lock()
+        # (server, sha256) -> SampleRef. Per provider, not per process: a server that was reset
+        # hands out ids again, so a new session must look its samples up afresh.
+        self._samples = LockedCache()
+        # Edges into one node can be visited concurrently; each must see the other's new entities.
+        self._entity_locks: dict[int, threading.Lock] = {}
         self._config = config
         # (target node id, target entity id) -> MCRIT label of the matched function
         self._labels: dict[tuple[int, int], str] = {}
+
+    def _entity_lock(self, node_id: int) -> threading.Lock:
+        with self._lock:
+            return self._entity_locks.setdefault(node_id, threading.Lock())
 
     def _client(self) -> McritClient:
         with self._lock:
@@ -232,7 +241,7 @@ class McritProvider(SimilarityProvider):
         return _set
 
     def _sample(self, client, config, report, should_stop, on_progress=None):
-        return SAMPLES.get_or_set(
+        return self._samples.get_or_set(
             (config.server, report.sha256),
             lambda: ensure_sample(
                 client,
@@ -381,8 +390,9 @@ class McritProvider(SimilarityProvider):
         advance(0.9)
 
         source_index = index_entities(_entities(to_node))
-        target_index = index_entities(_entities(from_node))
-        _add_match_only_entities(from_node, from_view, from_report, matches, target_index)
+        with self._entity_lock(from_node.id):
+            target_index = index_entities(_entities(from_node))
+            _add_match_only_entities(from_node, from_view, from_report, matches, target_index)
         paired, unresolved = pair_matches(matches, source_index, target_index, scheduled)
         for leftover in unresolved:
             log_debug(

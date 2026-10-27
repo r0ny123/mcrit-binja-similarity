@@ -21,7 +21,7 @@ import pytest
 import requests
 
 from mcrit_similarity import provider as provider_module
-from mcrit_similarity.cache import FUNCTION_OFFSETS, SAMPLES
+from mcrit_similarity.cache import FUNCTION_OFFSETS
 from mcrit_similarity.export import export_smda_report
 from tests.conftest import FIXTURES, analysed_views
 
@@ -80,7 +80,7 @@ def _make_provider(server: str, **overrides: Any):
 
 def _forget_servers() -> None:
     """Drop what the plugin remembers about any server; the exported reports stay cached."""
-    for cache in (SAMPLES, FUNCTION_OFFSETS, provider_module.CORPUS_MATCHES):
+    for cache in (FUNCTION_OFFSETS, provider_module.CORPUS_MATCHES):
         cache.clear()
 
 

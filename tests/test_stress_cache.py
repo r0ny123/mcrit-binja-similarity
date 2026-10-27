@@ -218,4 +218,5 @@ def test_a_read_only_folder_is_reported_not_raised(tmp_path, report, caplog):
     blocked = tmp_path / "reports"
     blocked.write_bytes(b"this is a file, not a folder")
     diskcache.store(blocked, report.sha256, report)
+    assert "could not cache SMDA report" in caplog.text
     assert diskcache.load(blocked, report.sha256) is None

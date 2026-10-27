@@ -138,11 +138,12 @@ def test_load_refreshes_mtime(folder):
     assert path.stat().st_mtime > 0
 
 
-def test_unwritable_folder_is_not_an_error(tmp_path):
+def test_unwritable_folder_is_not_an_error(tmp_path, caplog):
     blocker = tmp_path / "file"
     blocker.write_bytes(b"")
     report = _report()
     diskcache.store(blocker / "sub", report.sha256, report)
+    assert "could not cache SMDA report" in caplog.text
     assert diskcache.load(blocker / "sub", report.sha256) is None
 
 

@@ -105,3 +105,40 @@ def test_waiter_can_stop_while_another_caller_builds():
     release.set()
     builder.join(5)
     assert cache.get("k") == "built"
+
+
+def test_weighted_cache_evicts_oldest_entries_over_its_budget_but_keeps_the_newest():
+    cache = LockedCache(max_weight=10, weigh=len)
+    cache.set("a", "xxxx")
+    cache.set("b", "xxxx")
+    cache.set("c", "xxxx")
+    assert (cache.get("a"), cache.get("b"), cache.get("c")) == (None, "xxxx", "xxxx")
+    cache.set("huge", "x" * 50)
+    assert cache.get("huge") == "x" * 50
+    assert cache.get("b") is None and cache.get("c") is None
+
+
+def test_weighted_cache_replaces_an_entry_without_double_counting_it():
+    cache = LockedCache(max_weight=10, weigh=len)
+    for _ in range(5):
+        cache.set("a", "xxxxxxxx")
+    cache.set("b", "xx")
+    assert cache.get("a") == "xxxxxxxx" and cache.get("b") == "xx"
+    cache.clear()
+    cache.set("a", "xxxxxxxxxx")
+    assert cache.get("a") == "xxxxxxxxxx"
+
+
+def test_weighing_happens_outside_the_cache_lock():
+    cache = LockedCache(
+        max_weight=100, weigh=lambda value: len(value) + len(cache.get("probe") or "")
+    )
+    cache.set("probe", "p")
+    finished = threading.Event()
+
+    def store():
+        cache.set("a", "xx")
+        finished.set()
+
+    threading.Thread(target=store, daemon=True).start()
+    assert finished.wait(2), "weigh ran while the cache lock was held"

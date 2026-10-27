@@ -71,6 +71,10 @@ class McritClient:
     ) -> None:
         self.mcrit_server = _normalize_server(mcrit_server)
         parsed = urlparse(self.mcrit_server)
+        if parsed.username or parsed.password:
+            raise McritAuthError(
+                "Do not put credentials in the server URL; use the Username and API token settings."
+            )
         if apitoken and parsed.scheme == "http" and not is_loopback(self.mcrit_server):
             raise McritAuthError(
                 f"Cannot transmit API token over unencrypted HTTP to non-loopback host '{parsed.hostname}'. "
@@ -145,6 +149,12 @@ class McritClient:
             payload = response.json()
         except ValueError as exc:
             raise McritHttpError("MCRIT returned a non-JSON body") from exc
+        if isinstance(payload, dict) and payload.get("status") == "failed":
+            data = payload.get("data")
+            detail = payload.get("message") or (
+                data.get("message") if isinstance(data, dict) else None
+            )
+            raise McritHttpError(f"MCRIT reported a failure: {detail or 'no details'}")
         if isinstance(payload, dict) and payload.get("status") in _SUCCESS:
             return payload.get("data")
         if isinstance(payload, dict) and "data" in payload:

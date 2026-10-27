@@ -74,3 +74,21 @@ def test_sample_corpus_request_sends_matching_params():
         "band_matches_required": 2,
         "force_recalculation": True,
     }
+
+
+def test_a_failed_envelope_is_an_error_even_with_http_200():
+    client = McritClient("http://127.0.0.1:8000")
+    with patch("mcrit_similarity.mcrit.client._send") as request:
+        request.return_value = FakeResponse(
+            200, {"status": "failed", "data": None, "message": "database is down"}
+        )
+        with pytest.raises(McritHttpError, match="database is down"):
+            client.get_sample_by_sha256("aa")
+        request.return_value = FakeResponse(200, {"status": "failed", "data": {"message": "nope"}})
+        with pytest.raises(McritHttpError, match="nope"):
+            client.get_version()
+
+
+def test_credentials_in_the_server_url_are_refused():
+    with pytest.raises(McritAuthError, match="server URL"):
+        McritClient("https://user:secret@mcrit.example/api/")

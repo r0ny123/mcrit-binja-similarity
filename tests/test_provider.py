@@ -12,7 +12,12 @@ from mcrit_similarity.errors import McritAuthError
 from mcrit_similarity.mapping import Entity
 from mcrit_similarity.mcrit.parse import FunctionMatch
 from mcrit_similarity.mcrit.samples import SampleRef
-from mcrit_similarity.provider import McritProvider, _function_name, _Stopped
+from mcrit_similarity.provider import (
+    McritProvider,
+    _add_match_only_entities,
+    _function_name,
+    _Stopped,
+)
 
 
 class FakeNode:
@@ -313,3 +318,61 @@ def test_a_real_failure_during_a_stop_is_still_logged_as_an_error(provider_type)
         assert provider.perform_visit_node_edge(Mock(), Mock(), Mock(), completion) is False
     log_error.assert_called_once_with("denied")
     log_info.assert_not_called()
+
+
+def _match(target_offset):
+    return FunctionMatch(
+        source_offset=0x1000,
+        target_offset=target_offset,
+        source_function_id=1,
+        target_function_id=2,
+        target_sample_id=3,
+        target_family_id=0,
+        score=90.0,
+        flags=1,
+        num_bytes=64.0,
+    )
+
+
+@pytest.mark.parametrize(
+    "target_offset, listed, in_view, created",
+    [
+        (0x2000, False, True, True),
+        (0x2000, True, True, False),
+        (0x2000, False, False, False),
+        (None, False, True, False),
+    ],
+)
+def test_match_only_entities_are_created_only_for_unlisted_functions_in_the_view(
+    target_offset, listed, in_view, created
+):
+    from_node = Mock()
+    from_node.create_entity.return_value = 7
+    view = Mock()
+    view.get_function_at.side_effect = lambda offset: (
+        object() if in_view and offset == 0x2000 else None
+    )
+    report = SimpleNamespace(getFunction=lambda offset: None)
+    index = {0x2000: Entity(1, 0x2000, "known")} if listed else {}
+    _add_match_only_entities(from_node, view, report, [_match(target_offset)], index)
+    assert from_node.create_entity.called is created
+    if created:
+        assert index[0x2000] == Entity(7, 0x2000, "sub_2000")
+
+
+def test_samples_are_cached_per_provider_not_per_process(provider_type):
+    report = SimpleNamespace(sha256="aa")
+    config = ProviderConfig()
+    with patch("mcrit_similarity.provider.ensure_sample", return_value="ref") as ensure:
+        first = McritProvider(provider_type, config)
+        assert first._sample(Mock(), config, report, lambda: False) == "ref"
+        assert first._sample(Mock(), config, report, lambda: False) == "ref"
+        assert ensure.call_count == 1
+        McritProvider(provider_type, config)._sample(Mock(), config, report, lambda: False)
+        assert ensure.call_count == 2
+
+
+def test_each_node_has_its_own_entity_lock(provider_type):
+    provider = McritProvider(provider_type, ProviderConfig())
+    assert provider._entity_lock(1) is provider._entity_lock(1)
+    assert provider._entity_lock(1) is not provider._entity_lock(2)

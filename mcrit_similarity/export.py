@@ -92,7 +92,7 @@ def cached_report(bv) -> object | None:
     if report is None:
         if _COLD_MISSES.get((session, key)):
             return None
-        report = _load_small(key)
+        report = _load_small(bv, key)
         if report is None:
             _COLD_MISSES.set((session, key), True)
             return None
@@ -127,14 +127,33 @@ def preload_report(bv) -> None:
     key = (sha256, len(bv.functions))
     report = REPORTS.get(key)
     if report is None:
-        report = diskcache.load(folder, sha256)
+        report = _load_current(bv, folder, sha256)
         if report is None:
             return
         REPORTS.set(key, report)
     REPORT_KEYS.set(session, key)
 
 
-def _load_small(key: tuple[str, int]) -> object | None:
+def _analysis_changed(report, bv) -> bool:
+    """Whether functions were added or removed since the report was stored.
+
+    Binary Ninja's function count for the same bytes varies by a few between processes, so only a
+    larger gap counts, such as functions defined by hand in a database. Import stubs are left out
+    of the count because the exporter skips them.
+    """
+    from smda.binja.BinjaInterface import BinjaInterface
+
+    interface = BinjaInterface(bv)
+    count = sum(1 for function in bv.functions if not interface.isExternalFunction(function.start))
+    return abs(count - report.num_functions) > max(8, count // 50)
+
+
+def _load_current(bv, folder: Path, sha256: str) -> object | None:
+    report = diskcache.load(folder, sha256)
+    return None if report is not None and _analysis_changed(report, bv) else report
+
+
+def _load_small(bv, key: tuple[str, int]) -> object | None:
     folder = _disk_folder()
     if folder is None:
         return None
@@ -143,7 +162,7 @@ def _load_small(key: tuple[str, int]) -> object | None:
             return None
     except OSError:
         return None
-    return diskcache.load(folder, key[0])
+    return _load_current(bv, folder, key[0])
 
 
 def _build_report(bv) -> object:
@@ -167,7 +186,7 @@ def _load_or_build(bv, key: tuple[str, int]) -> object:
     if folder is None:
         return _build_report(bv)
     first_export = _EXPORTED_KEYS.get(bv.file.session_id) is None
-    report = diskcache.load(folder, key[0]) if first_export else None
+    report = _load_current(bv, folder, key[0]) if first_export else None
     if report is None:
         report = _build_report(bv)
         diskcache.store(folder, key[0], report)

@@ -76,13 +76,22 @@ def pending_index_job(client: SampleClient, sample_id: int) -> str | None:
     """Id of a queued or running MinHash indexing job for exactly ``sample_id``."""
     # MCRIT filters on Job.parameters, "updateMinHashesForSample(<sample_id>)" in 1.8 and 1.9. The
     # filter is a substring match, so the closing parenthesis keeps sample 7 from matching 70.
+    states = set()
     for job in client.get_jobs(_INDEX_METHOD, f"{_INDEX_METHOD}({sample_id})"):
-        if _indexes_sample(job, sample_id) and job_state(job) in ("queued", "in_progress"):
+        if not _indexes_sample(job, sample_id):
+            continue
+        state = job_state(job)
+        states.add(state)
+        if state in ("queued", "in_progress"):
             job_id = job.get("_id")
             if isinstance(job_id, dict):
                 job_id = job_id.get("$oid")
             if job_id:
                 return str(job_id)
+    if states & {"failed", "terminated"} and "finished" not in states:
+        log_warn(
+            f"MCRIT failed to index sample {sample_id}; it will match nothing until it is indexed"
+        )
     return None
 
 
