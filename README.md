@@ -136,6 +136,7 @@ Binary Ninja's own [troubleshooting guide](https://docs.binary.ninja/guide/simil
 - **Log says `MCRIT Similarity requires Binary Ninja Ultimate 6.0+`** — Binary Similarity needs Ultimate; the plugin intentionally stays idle otherwise.
 - **No results / requests fail** — check the server URL: mcritweb wants the trailing `/api/`, the direct API does not. Raise *Request timeout* for slow uploads.
 - **`403`** — the API token is missing or wrong (`Test Server Connection` shows which), or, on upload, it lacks contributor or admin rights. If both samples are already on the server, turning *persist samples* off also unblocks the session.
+- **Log warns `MCRIT applied different matching parameters than requested`** — the server (mcritweb in particular) ignored or capped the MinHash threshold, PicHash size or LSH bands you set; the warning lists each as `requested -> applied`. Point the plugin at the direct API to use your values.
 - **No matches between different architectures** — expected: MCRIT 1.13+ matches within one architecture only.
 - **Render warns `no SMDA report is cached` after a restart** — re-run the session; reports reload in the background once analysis finishes.
 - **Settings look duplicated** — that is the MCRIT disassembler plugin's own **MCRIT** group; this plugin's settings are under **MCRIT Binary Similarity**.

@@ -131,6 +131,22 @@ def parse_vs_result(
     return selected
 
 
+def applied_overrides(
+    payload: dict[str, Any], requested: dict[str, int]
+) -> dict[str, tuple[int, int]]:
+    """Matching parameters the server applied differently from ``requested``, as (asked, applied)."""
+    info = payload.get("info") if isinstance(payload, dict) else None
+    matching = info.get("matching") if isinstance(info, dict) else None
+    applied = matching.get("applied") if isinstance(matching, dict) else None
+    if not isinstance(applied, dict):
+        return {}
+    return {
+        key: (asked, applied[key])
+        for key, asked in requested.items()
+        if key in applied and applied[key] != asked
+    }
+
+
 def decode_offset(value: Any, bitness: int = 64) -> int | None:
     if value is None:
         return None

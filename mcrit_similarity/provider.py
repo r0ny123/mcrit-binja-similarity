@@ -27,6 +27,7 @@ from mcrit_similarity.log import log_debug, log_error, log_info, log_warn
 from mcrit_similarity.mapping import Entity, index_entities, lookup_entity, pair_matches
 from mcrit_similarity.mcrit.client import McritClient
 from mcrit_similarity.mcrit.parse import (
+    applied_overrides,
     parse_vs_result,
     target_functions,
     unique_target_function_ids,
@@ -353,6 +354,19 @@ class McritProvider(SimilarityProvider):
             client, config, from_sample, to_sample, to_node, should_stop, span(0.55, 0.88)
         )
         advance(0.88)
+        overrides = applied_overrides(
+            payload,
+            {
+                "minhash_threshold": config.minhash_threshold,
+                "pichash_size": config.pichash_size,
+                "band_matches_required": config.band_matches_required,
+            },
+        )
+        if overrides:
+            changes = ", ".join(
+                f"{key} {asked} -> {got}" for key, (asked, got) in overrides.items()
+            )
+            log_warn(f"MCRIT applied different matching parameters than requested: {changes}")
         matches = parse_vs_result(
             payload,
             min_score=config.minhash_threshold,

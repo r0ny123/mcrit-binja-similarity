@@ -125,3 +125,32 @@ def test_corpus_label_prefers_newest_real_label():
     assert corpus_label(entry) == "new_name"
     assert corpus_label({"function_labels": None}) == ""
     assert corpus_label({}) == ""
+
+
+def _applied_payload(applied):
+    return {"info": {"matching": {"requested": {}, "applied": applied}}, "matches": {}}
+
+
+def test_applied_overrides_lists_only_the_changed_parameters():
+    from mcrit_similarity.mcrit.parse import applied_overrides
+
+    requested = {"minhash_threshold": 50, "pichash_size": 10, "band_matches_required": 2}
+    applied = {"minhash_threshold": 50, "pichash_size": 10, "band_matches_required": 1}
+    assert applied_overrides(_applied_payload(applied), requested) == {
+        "band_matches_required": (2, 1)
+    }
+    assert applied_overrides(_applied_payload(dict(requested)), requested) == {}
+
+
+def test_applied_overrides_tolerates_servers_that_do_not_report_them():
+    from mcrit_similarity.mcrit.parse import applied_overrides
+
+    requested = {"minhash_threshold": 50}
+    for payload in (
+        {},
+        {"info": None},
+        {"info": {"matching": None}},
+        _applied_payload("odd"),
+        _applied_payload({}),
+    ):
+        assert applied_overrides(payload, requested) == {}
