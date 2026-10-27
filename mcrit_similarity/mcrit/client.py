@@ -72,8 +72,12 @@ class McritClient:
         timeout: float | None = 30,
     ) -> None:
         self.mcrit_server = _normalize_server(mcrit_server)
-        parsed = urlparse(self.mcrit_server)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        try:
+            parsed = urlparse(self.mcrit_server)
+            valid = parsed.scheme in ("http", "https") and bool(parsed.hostname)
+        except ValueError:
+            valid = False
+        if not valid:
             raise McritUnavailableError(
                 f"MCRIT server URL must start with http:// or https://, got {mcrit_server!r}"
             )

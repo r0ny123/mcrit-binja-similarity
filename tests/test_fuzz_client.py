@@ -229,3 +229,8 @@ def test_a_long_bad_request_body_is_truncated():
         with pytest.raises(McritHttpError) as caught:
             client().get_version()
     assert len(str(caught.value)) < 600
+
+
+def test_a_malformed_ipv6_server_url_is_a_plugin_error():
+    with pytest.raises(McritUnavailableError, match="http"):
+        McritClient("http://[::1:8000")

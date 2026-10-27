@@ -328,3 +328,8 @@ def test_preload_failures_on_a_closing_view_stay_quiet(monkeypatch, tmp_path):
     monkeypatch.setattr(export, "_disk_folder", lambda: tmp_path)
     monkeypatch.setattr(export, "_raw_sha256", closed)
     export.preload_report(_PreloadView(b"closing", session_id=9722))
+
+
+def test_a_queued_preload_for_a_collected_view_does_nothing(monkeypatch):
+    monkeypatch.setattr(export, "_preload", lambda bv: pytest.fail("the view is gone"))
+    export.preload_when_free(lambda: None)

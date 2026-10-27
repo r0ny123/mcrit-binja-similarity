@@ -8,6 +8,7 @@ import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from mcrit_similarity import diskcache
 from mcrit_similarity.architectures import SMDA_ARCHITECTURES, smda_architecture
@@ -119,7 +120,15 @@ def _warm_architecture(bv) -> str | None:
 
 def preload_report(bv) -> None:
     """Load a stored report for a freshly analysed view so its first render needs no disk I/O."""
+    preload_when_free(lambda: bv)
+
+
+def preload_when_free(view_ref: Callable[[], Any]) -> None:
+    """``preload_report`` for a weak reference, so a queued preload does not keep a view alive."""
     with _PRELOAD_LOCK:
+        bv = view_ref()
+        if bv is None:
+            return
         try:
             _preload(bv)
         except Exception as exc:
