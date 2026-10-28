@@ -171,12 +171,14 @@ jobs:
           mkdir -p "$site"
           echo "$RUNNER_TEMP/binaryninja/python" > "$site/binaryninja.pth"
 
+      # For a DMG with a license agreement, hdiutil pages it and then waits on stdin to accept.
       - name: Set up Binary Ninja (macOS)
         if: steps.config.outputs.method == 'installer' && runner.os == 'macOS'
         shell: bash
+        timeout-minutes: 10
         run: |
           mount="$RUNNER_TEMP/binaryninja-dmg"
-          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$RUNNER_TEMP/binaryninja-download" >/dev/null
+          env PAGER=cat hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$RUNNER_TEMP/binaryninja-download" >/dev/null < <(yes)
           mkdir -p "$RUNNER_TEMP/binaryninja"
           cp -R "$mount/Binary Ninja.app" "$RUNNER_TEMP/binaryninja/"
           hdiutil detach "$mount" >/dev/null
