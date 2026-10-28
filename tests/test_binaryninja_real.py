@@ -1,5 +1,7 @@
 """Tests that need a real headless Binary Ninja (MCRIT_TEST_REAL_BINARYNINJA=1). No MCRIT server."""
 
+import threading
+import weakref
 from pathlib import Path
 from typing import Any
 
@@ -139,3 +141,57 @@ def test_connection_check_command_is_registered():
     from mcrit_similarity.commands import COMMAND_NAME
 
     assert COMMAND_NAME in {command.name for command in bn.PluginCommand}
+
+
+# View events cannot be unregistered, so one forwarder is registered per process and only
+# forwards while a test has set a target.
+_EVENT_TARGET: list = []
+_EVENT_VIEWS: list = []
+
+
+def _forward_view_event(view) -> None:
+    if _EVENT_TARGET:
+        _EVENT_VIEWS.append(weakref.ref(view))
+        _EVENT_TARGET[0](view)
+
+
+bn.BinaryViewType.add_binaryview_initial_analysis_completion_event(_forward_view_event)
+
+
+def test_a_queued_background_preload_still_reaches_its_view(monkeypatch):
+    import gc
+    import importlib
+    import time
+
+    from mcrit_similarity import export
+    from tests.conftest import analysed_views
+
+    entry = importlib.import_module("__init__")
+    preloaded: list[str] = []
+    done = threading.Event()
+
+    def record(view) -> None:
+        preloaded.append(view.arch.name)
+        done.set()
+
+    monkeypatch.setattr(export, "_preload", record)
+    _EVENT_VIEWS.clear()
+    _EVENT_TARGET.append(entry._preload_in_background)
+    # Another preload holds the lock from before the file opens, so this one queues past the
+    # event callback. Binary Ninja drops its view wrapper when the callback returns; only a
+    # preload that holds the view keeps it, so the wrapper still alive after a second is fine.
+    export._PRELOAD_LOCK.acquire()
+    try:
+        with analysed_views("zlib-x86_64-Os"):
+            assert _EVENT_VIEWS, "Binary Ninja fired no analysis completion event"
+            settle = time.monotonic() + 1
+            while _EVENT_VIEWS[0]() is not None and time.monotonic() < settle:
+                gc.collect()
+                time.sleep(0.05)
+            export._PRELOAD_LOCK.release()
+            assert done.wait(30), "the queued preload never reached its view"
+    finally:
+        if export._PRELOAD_LOCK.locked() and not done.is_set():
+            export._PRELOAD_LOCK.release()
+        _EVENT_TARGET.clear()
+    assert preloaded[0] == "x86_64"
