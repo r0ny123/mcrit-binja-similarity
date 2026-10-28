@@ -288,7 +288,8 @@ jobs:
 
     services:
       mongo:
-        image: mongo:8
+        # MongoDB 8.0+ refuses to start on the runners' Linux 6.19+ kernel (SERVER-121912).
+        image: mongo:7.0
         ports:
           # Not the default port: a self-hosted runner may run a MongoDB of its own, and the
           # tests call POST /respawn, which empties the whole database.
