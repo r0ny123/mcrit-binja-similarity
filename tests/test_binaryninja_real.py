@@ -177,9 +177,8 @@ def test_a_queued_background_preload_still_reaches_its_view(monkeypatch):
     monkeypatch.setattr(export, "_preload", record)
     _EVENT_VIEWS.clear()
     _EVENT_TARGET.append(entry._preload_in_background)
-    # Another preload holds the lock from before the file opens, so this one queues past the
-    # event callback. Binary Ninja drops its view wrapper when the callback returns; only a
-    # preload that holds the view keeps it, so the wrapper still alive after a second is fine.
+    # Hold the lock from before the file opens so this preload queues past the event callback,
+    # then give the event's view wrapper a second to be freed; a preload holding it keeps it.
     export._PRELOAD_LOCK.acquire()
     try:
         with analysed_views("zlib-x86_64-Os"):

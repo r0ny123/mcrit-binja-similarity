@@ -240,8 +240,7 @@ jobs:
           BN_LICENSE_B64: ${{ matrix.platform == 'linux-x64-headless' && secrets.BN_HEADLESS_LICENSE_B64 || secrets.BN_LICENSE_B64 }}
         run: python -m pytest tests -p no:cacheprovider --tb=short
 
-      # The headless license has no Binary Similarity, and linux-x64 runs the end-to-end tests
-      # against MongoDB-backed MCRIT in the job below instead of the in-memory launcher.
+      # The headless license has no Binary Similarity; linux-x64 runs these in e2e-mongodb below.
       - name: Install MCRIT server
         if: steps.config.outputs.method != 'none' && matrix.platform != 'linux-x64-headless' && matrix.platform != 'linux-x64'
         run: python -m pip install -e ".[dev,e2e]"
@@ -270,8 +269,8 @@ jobs:
   # is job-wide, so this cannot be a step of the matrix above, which also covers macOS and Windows.
   e2e-mongodb:
     name: Linux x64, MongoDB end-to-end (${{ matrix.channel }})
-    # One license, one running instance: this job must not overlap the matrix above. !cancelled()
-    # still runs it after a continue-on-error dev failure, but not after a cancelled run.
+    # `needs` keeps it from overlapping the matrix above. !cancelled() still runs it after a
+    # continue-on-error dev failure, but not after a cancelled run.
     needs: test
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     environment: binaryninja
@@ -369,7 +368,6 @@ jobs:
           BN_LICENSE_B64: ${{ secrets.BN_LICENSE_B64 }}
         run: python -m pytest tests -m e2e -p no:cacheprovider --tb=short
 
-      # Self-hosted runners keep the user site-packages between jobs.
       - name: Unlink Binary Ninja
         if: always() && steps.config.outputs.method != 'none'
         shell: python
