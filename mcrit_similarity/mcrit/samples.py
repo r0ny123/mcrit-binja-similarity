@@ -148,16 +148,16 @@ def ensure_sample(
             "in the MCRIT provider settings to upload it"
         )
 
-    # Reports are cached and shared across sessions, so labels are applied at upload time.
-    smda_report.family = family
-    smda_report.version = version
+    # Reports are cached and shared across sessions, so labels go on the uploaded copy only.
+    payload = smda_report.toDict() if hasattr(smda_report, "toDict") else dict(smda_report)
+    payload["metadata"] = {**payload.get("metadata", {}), "family": family, "version": version}
     filename = getattr(smda_report, "filename", "") or "sample"
     count = getattr(smda_report, "num_functions", "?")
     log_warn(
         f"Uploading {filename} (sha256 {sha256[:12]}…, {count} functions) "
         f"to MCRIT at {client.mcrit_server}"
     )
-    added = client.add_report(smda_report)
+    added = client.add_report(payload)
     sample_info = added["sample_info"]
     if added.get("existed"):
         return _existing_sample(client, sample_info, sha256, should_stop, on_progress)

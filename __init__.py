@@ -30,14 +30,13 @@ def _register() -> None:
 
 def _preload_in_background(bv) -> None:
     import threading
-    import weakref
 
-    from mcrit_similarity.export import preload_when_free
+    from mcrit_similarity.export import preload_report
 
     # BinaryViewEvent callbacks run one after another; hashing must not hold up the others.
-    threading.Thread(
-        target=preload_when_free, args=(weakref.ref(bv),), name="mcrit-preload", daemon=True
-    ).start()
+    # The thread must hold ``bv`` strongly: Binary Ninja builds a fresh wrapper for each event
+    # and drops it when the callback returns, so a weak reference is already dead.
+    threading.Thread(target=preload_report, args=(bv,), name="mcrit-preload", daemon=True).start()
 
 
 try:

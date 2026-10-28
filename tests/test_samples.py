@@ -70,9 +70,12 @@ class FakeClient:
     def add_report(self, smda_report):
         self.added.append(smda_report)
         if self.add_existed:
-            return {"existed": True, "sample_info": {"sample_id": 7, "sha256": smda_report.sha256}}
+            return {
+                "existed": True,
+                "sample_info": {"sample_id": 7, "sha256": smda_report["sha256"]},
+            }
         return {
-            "sample_info": {"sample_id": 9, "sha256": smda_report.sha256},
+            "sample_info": {"sample_id": 9, "sha256": smda_report["sha256"]},
             "job_id": "hash-job",
         }
 
@@ -155,10 +158,12 @@ def test_cancelled_minhash_job():
         ensure_sample(client, Report("dd"), persist=True, should_stop=lambda: True)
 
 
-def test_labels_are_applied_at_upload_not_to_existing_samples():
+def test_labels_go_on_the_upload_without_touching_the_shared_report():
+    client = FakeClient()
     fresh = Report("ee")
-    ensure_sample(FakeClient(), fresh, persist=True, family="emotet", version="v2")
-    assert (fresh.family, fresh.version) == ("emotet", "v2")
+    ensure_sample(client, fresh, persist=True, family="emotet", version="v2")
+    assert client.added[-1]["metadata"] == {"family": "emotet", "version": "v2"}
+    assert (fresh.family, fresh.version) == (None, None)
 
     client = FakeClient()
     client.samples["ff"] = {"sample_id": 9, "sha256": "ff"}
@@ -258,8 +263,7 @@ def test_a_terminated_index_job_is_reported(caplog):
     assert "failed to index sample 7" in caplog.text
 
 
-def test_blank_labels_clear_ones_left_on_a_shared_report():
-    report = Report("ab")
-    report.family, report.version = "emotet", "v2"
-    ensure_sample(FakeClient(), report, persist=True)
-    assert (report.family, report.version) == ("", "")
+def test_a_dict_report_is_uploaded_with_blank_labels():
+    client = FakeClient()
+    ensure_sample(client, {"sha256": "ab", "metadata": {"family": "old"}}, persist=True)
+    assert client.added[-1]["metadata"] == {"family": "", "version": ""}
