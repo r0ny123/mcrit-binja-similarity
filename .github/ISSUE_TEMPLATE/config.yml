@@ -1,8 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Report a security vulnerability
-    url: https://github.com/r0ny123/mcrit-binja-similarity/security/advisories/new
-    about: Report privately; see SECURITY.md.
   - name: MCRIT server or matching results
     url: https://github.com/familiary/mcrit/issues
     about: Issues in the MCRIT server, mcritweb or its matching belong to the MCRIT project.
