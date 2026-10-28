@@ -1,4 +1,4 @@
-name: Binary Ninja
+name: Binary Ninja integration
 
 on:
   push:
@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.platform }} (${{ matrix.channel }})
+    name: ${{ matrix.label }} (${{ matrix.channel }})
     # Only the default branch uses the license; pull request code never runs with it.
     if: github.ref == 'refs/heads/main'
     environment: binaryninja
@@ -49,6 +49,7 @@ jobs:
         channel: ${{ fromJSON(github.event_name == 'push' && '["stable"]' || inputs.channel == 'stable' && '["stable"]' || inputs.channel == 'dev' && '["dev"]' || '["stable", "dev"]') }}
         include:
           - platform: linux-x64
+            label: Linux x64
             os: ubuntu-24.04
             runner_variable: BN_RUNNER_LINUX_X64
             secret_suffix: LINUX_X64
@@ -57,21 +58,25 @@ jobs:
           # build only accepts the headless license, which has no Binary Similarity. This job
           # tracks new builds without URL upkeep; the similarity tests run on the other jobs.
           - platform: linux-x64-headless
+            label: Linux x64, headless build
             os: ubuntu-24.04
             runner_variable: BN_RUNNER_LINUX_X64
             secret_suffix: NONE
             license_secret: BN_HEADLESS_LICENSE_B64
           - platform: linux-arm64
+            label: Linux arm64
             os: ubuntu-24.04-arm
             runner_variable: BN_RUNNER_LINUX_ARM64
             secret_suffix: LINUX_ARM64
             license_secret: BN_LICENSE_B64
           - platform: macos
+            label: macOS
             os: macos-15
             runner_variable: BN_RUNNER_MACOS
             secret_suffix: MACOS
             license_secret: BN_LICENSE_B64
           - platform: windows
+            label: Windows
             os: windows-2025
             runner_variable: BN_RUNNER_WINDOWS
             secret_suffix: WINDOWS
@@ -264,7 +269,7 @@ jobs:
   # the tests launch is MongoDB-backed and gets a worker process of its own. A service container
   # is job-wide, so this cannot be a step of the matrix above, which also covers macOS and Windows.
   e2e-mongodb:
-    name: linux-x64 end-to-end (MongoDB, ${{ matrix.channel }})
+    name: Linux x64, MongoDB end-to-end (${{ matrix.channel }})
     # One license, one running instance: this job must not overlap the matrix above. !cancelled()
     # still runs it after a continue-on-error dev failure, but not after a cancelled run.
     needs: test
