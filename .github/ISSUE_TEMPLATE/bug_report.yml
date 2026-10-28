@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the plugin does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin version or commit
+      placeholder: 0.1.0 or a commit hash
+    validations:
+      required: true
+  - type: input
+    id: binaryninja
+    attributes:
+      label: Binary Ninja version
+      placeholder: 6.0.10905 Ultimate, stable channel
+    validations:
+      required: true
+  - type: dropdown
+    id: server
+    attributes:
+      label: MCRIT server
+      options:
+        - Direct MCRIT API
+        - mcritweb
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and sample architecture
+      placeholder: macOS 26, x86_64 PE
+  - type: textarea
+    id: log
+    attributes:
+      label: Binary Ninja log output
+      description: Lines from the log that mention MCRIT. The plugin never logs the API token, but check before posting.
+      render: text
