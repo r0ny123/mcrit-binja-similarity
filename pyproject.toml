@@ -46,7 +46,7 @@ pythonpath = ["."]
 python-version = "3.12"
 
 [tool.ty.src]
-include = ["mcrit_similarity", "tests", "__init__.py"]
+include = ["mcrit_similarity", "tests", "__init__.py", ".github/scripts"]
 exclude = ["examples"]
 
 [tool.ty.analysis]
