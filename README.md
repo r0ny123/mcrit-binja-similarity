@@ -7,7 +7,7 @@
 
 Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja's [Binary Similarity](https://docs.binary.ninja/guide/similarity.html) sessions, next to BinDiff and WARP. Match two binaries, review the pairs side by side, and carry names and types across, all from Binary Ninja's own similarity UI.
 
-![An MCRIT match rendered side by side as Pseudo C in Binary Ninja, changed lines in orange, above the session's MCRIT results](https://raw.githubusercontent.com/r0ny123/mcrit-binja-similarity/main/docs/rendered-diff.png)
+![An MCRIT match rendered side by side as Pseudo C in Binary Ninja, changed lines in orange, above the session's MCRIT results](docs/rendered-diff.png)
 
 ## Features
 
@@ -86,9 +86,9 @@ Open B's node to list the matches, and type `MCRIT` in the search box to keep on
 
 A quick sanity check: functions that have the same name on both sides should match themselves.
 
-![A session on the built-in server: the two binaries, MCRIT's matches ranked by similarity, and the log of the upload and match](https://raw.githubusercontent.com/r0ny123/mcrit-binja-similarity/main/docs/session.png)
+![A session on the built-in server: the two binaries, MCRIT's matches ranked by similarity, and the log of the upload and match](docs/session.png)
 
-![The graph view of a match: blocks only the O2 build has in green, changed instructions in orange](https://raw.githubusercontent.com/r0ny123/mcrit-binja-similarity/main/docs/graph-diff.png)
+![The graph view of a match: blocks only the O2 build has in green, changed instructions in orange](docs/graph-diff.png)
 
 > [!TIP]
 > For a session with MCRIT alone, remove the other providers under **Configuration**, then save the setup with `Profiles > Save Current as Profile...` for the next Quick Setup. `Add Provider > MCRIT` adds it to a session you set up by hand.
