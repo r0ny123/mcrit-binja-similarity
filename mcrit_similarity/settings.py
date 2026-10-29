@@ -79,7 +79,7 @@ def register_global_settings() -> None:
             "title": "Server URL",
             "type": "string",
             "default": DEFAULT_SERVER,
-            "description": "Default MCRIT server URL, or builtin to run MCRIT inside Binary Ninja.",
+            "description": "builtin runs MCRIT inside Binary Ninja; otherwise the MCRIT server or mcritweb URL.",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
         "username": {

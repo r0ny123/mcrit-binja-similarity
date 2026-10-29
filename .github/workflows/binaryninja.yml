@@ -244,10 +244,6 @@ jobs:
         run: python -m pytest tests -p no:cacheprovider --tb=short
 
       # The headless license has no Binary Similarity; linux-x64 runs these in e2e-mongodb below.
-      - name: Install MCRIT server
-        if: steps.config.outputs.method != 'none' && matrix.platform != 'linux-x64-headless' && matrix.platform != 'linux-x64'
-        run: python -m pip install -e ".[dev,e2e]"
-
       - name: Pytest end-to-end (launched MCRIT server)
         if: steps.config.outputs.method != 'none' && matrix.platform != 'linux-x64-headless' && matrix.platform != 'linux-x64'
         timeout-minutes: 15
@@ -328,7 +324,7 @@ jobs:
 
       - name: Install
         if: steps.config.outputs.method != 'none'
-        run: python -m pip install -e ".[dev,e2e]"
+        run: python -m pip install -e ".[dev]"
 
       - name: Set up Binary Ninja
         if: steps.config.outputs.method != 'none'

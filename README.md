@@ -12,8 +12,8 @@ Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja'
 ## Features
 
 - **MCRIT as a session provider.** Every function in one binary gets its best MCRIT match in the other, scored on Binary Ninja's 0–255 scale.
-- **No server needed.** Set the server URL to `builtin` and MCRIT runs inside Binary Ninja. You don't need Docker, MongoDB or an account.
-- **Or bring your corpus.** Connect to an MCRIT server or mcritweb to match against shared samples, labels and families.
+- **Works out of the box.** By default MCRIT runs inside Binary Ninja. You don't need a server, Docker, MongoDB or an account.
+- **Or bring your corpus.** Point it at an MCRIT server or mcritweb, with your API token, to match against shared samples, labels and families.
 - **Side-by-side diffs.** Render any match in the Graph or Linear view, as disassembly, IL or pseudo-code. Changed lines are orange, removed red, added green.
 - **Apply.** Copy names, types, variables and comments from the matched function, and optionally name unnamed functions after their MCRIT label.
 - **Confidence reflects ambiguity.** It drops when another candidate scores close to the best one.
@@ -25,12 +25,15 @@ For the MCRIT sidebar that browses a corpus inside IDA, Binary Ninja or Ghidra, 
 
 ## Requirements
 
-- Binary Ninja **Ultimate** 6.0, build 10601 or newer. Binary Similarity is an Ultimate feature; on other editions the plugin stays idle.
-- The Python packages `smda` and `requests`, plus `mcrit` for the built-in server.
+Binary Ninja **Ultimate** 6.0, build 10601 or newer. Binary Similarity is an Ultimate feature; on other editions the plugin stays idle.
 
 ## Install
 
-1. **Link the plugin** into Binary Ninja's plugin folder (`Plugins > Open Plugin Folder...` opens it):
+**From the extension manager:** `Plugins > Manage Extensions`, search for **MCRIT Similarity**, and click **Install**. Binary Ninja installs the Python packages it needs (`smda`, `requests` and `mcrit`, about 480 MB with numpy, scipy and lief). Restart Binary Ninja, and it is ready to use.
+
+**From a clone:**
+
+1. Link the repository into Binary Ninja's plugin folder (`Plugins > Open Plugin Folder...` opens it):
 
    ```bash
    git clone https://github.com/r0ny123/mcrit-binja-similarity
@@ -46,7 +49,7 @@ For the MCRIT sidebar that browses a corpus inside IDA, Binary Ninja or Ghidra, 
    mklink /J "%APPDATA%\Binary Ninja\plugins\mcrit-binja-similarity" "%CD%"
    ```
 
-2. **Install the Python packages.** Open the command palette (`Cmd+P` / `Ctrl+P`), run `Install python3 module`, and enter one package per line:
+2. Install the Python packages. Open the command palette (`Cmd+P` / `Ctrl+P`), run `Install python3 module`, and enter one package per line:
 
    ```text
    smda==5.0.1
@@ -54,19 +57,7 @@ For the MCRIT sidebar that browses a corpus inside IDA, Binary Ninja or Ghidra, 
    mcrit==1.16.0
    ```
 
-   Leave out `mcrit` if you will only use a server. It is a large install, about 480 MB with numpy, scipy and lief.
-
-3. **Restart Binary Ninja.** The log shows `Registered MCRIT Binary Similarity provider`.
-
-4. **Pick a server.** In Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity` and set **Server URL**:
-
-   | Server URL | What it is |
-   |---|---|
-   | `builtin` | MCRIT inside Binary Ninja. Nothing else to run. |
-   | `http://127.0.0.1:8000/` | A local MCRIT API (the default). |
-   | `https://<host>/api/` | mcritweb. Also set **Username** and **API token**. |
-
-5. **Check it.** `Plugins > MCRIT Similarity > Test Server Connection` reports the server's MCRIT version, or what is wrong with the URL or token. It works with no file open.
+3. Restart Binary Ninja. The log shows `Registered MCRIT Binary Similarity provider`.
 
 To install the packages from a terminal instead, use the module folder Binary Ninja reads. `python3.13` must match the version Binary Ninja bundles (the folder is named `python3xx`):
 
@@ -76,6 +67,18 @@ python3.13 -m pip install --target ~/Library/Application\ Support/Binary\ Ninja/
 ```
 
 If `python.interpreter` in Settings points at your own Python, install into that one.
+
+## Choose a server
+
+Out of the box the plugin uses the built-in server, so there is nothing to set up. To match against your own MCRIT server or mcritweb instead, open Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity`, and set:
+
+| Server | Server URL | Also set |
+|---|---|---|
+| Built-in (default) | `builtin` | nothing |
+| MCRIT API | for example `http://127.0.0.1:8000/` | nothing |
+| mcritweb | `https://<host>/api/` | **Username** and **API token** |
+
+Then run `Plugins > MCRIT Similarity > Test Server Connection`. It reports the server's MCRIT version, or what is wrong with the URL or token, and works with no file open.
 
 ## Compare two binaries
 
@@ -97,7 +100,7 @@ A quick sanity check: functions that have the same name on both sides should mat
 
 ## The built-in server
 
-With the server URL set to `builtin`, MCRIT starts inside Binary Ninja the first time it is needed, which takes several seconds. It gives the same results as a standalone MCRIT 1.16 server.
+This is the default. MCRIT starts inside Binary Ninja the first time it is needed, which takes several seconds. It gives the same results as a standalone MCRIT 1.16 server.
 
 - Samples live in memory until Binary Ninja exits, so each run indexes them again. Two binaries of a few thousand functions take seconds.
 - It only knows the binaries in your sessions. Matching against a shared corpus, with its labels and families, needs a server.
@@ -125,7 +128,7 @@ Under Settings > **MCRIT Binary Similarity**:
 
 | Setting | Meaning |
 |---|---|
-| Server URL | `builtin`, an MCRIT API URL, or mcritweb's `/api/` URL. Default `http://127.0.0.1:8000/` |
+| Server URL | `builtin` (the default), an MCRIT API URL, or mcritweb's `/api/` URL |
 | Username | `username` header for mcritweb |
 | API token | Moved into the system keychain on first use, after which the field reads empty. Enter a new token to replace it |
 | Request timeout | Seconds per HTTP request |
@@ -215,7 +218,7 @@ python "/Applications/Binary Ninja.app/Contents/Resources/scripts/install_api.py
 MCRIT_TEST_REAL_BINARYNINJA=1 python -m pytest tests
 ```
 
-The end-to-end tests also start a throwaway MCRIT server (in memory, no MongoDB) on a loopback port and run real sessions. They need `pip install -e ".[dev,e2e]"`:
+The end-to-end tests also start a throwaway MCRIT server (in memory, no MongoDB) on a loopback port and run real sessions:
 
 ```bash
 MCRIT_TEST_REAL_BINARYNINJA=1 MCRIT_TEST_E2E=1 python -m pytest tests -m e2e
@@ -234,7 +237,7 @@ Maintained by [r0ny123](https://github.com/r0ny123). Contributions are welcome: 
 |---|---|---|
 | [SMDA](https://github.com/danielplohmann/smda) | BSD-2-Clause | dependency |
 | [Requests](https://github.com/psf/requests) | Apache-2.0 | dependency |
-| [MCRIT](https://github.com/familiary/mcrit) | GPL-3.0 | optional, built-in server |
+| [MCRIT](https://github.com/familiary/mcrit) | GPL-3.0 | dependency, built-in server |
 | [zlib](https://www.zlib.net/) 1.3.1 | [zlib License](tests/fixtures/zlib_License.txt) | test binaries in `tests/fixtures/` |
 
 Binary Ninja is proprietary software by Vector 35 and is not part of this repository.

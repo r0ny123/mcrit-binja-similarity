@@ -3,7 +3,7 @@ from mcrit_similarity.config import config_from_values
 
 def test_defaults_and_clamping():
     config = config_from_values({})
-    assert config.server.endswith("/")
+    assert config.server == "builtin"
     assert config.minhash_threshold == 50
     assert config.persist_samples is True
     assert config.apply_corpus_labels is False

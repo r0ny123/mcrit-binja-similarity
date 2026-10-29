@@ -15,16 +15,13 @@ authors = [{ name = "Rony" }]
 dependencies = [
     "smda==5.0.1",
     "requests",
+    "mcrit==1.16.0",
 ]
 
 [project.optional-dependencies]
 # hypothesis is pinned exactly: a new release can change how it generates examples,
 # which would make a property failure reproduce on one machine and not the next.
 dev = ["pytest", "ruff", "ty", "hypothesis==6.170.9"]
-# The built-in server runs MCRIT inside Binary Ninja; it is a heavy install.
-builtin = ["mcrit==1.16.0"]
-# The end-to-end tests launch MCRIT servers of their own.
-e2e = ["mcrit==1.16.0"]
 
 [tool.ruff]
 target-version = "py312"
