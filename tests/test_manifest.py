@@ -1,4 +1,4 @@
-"""plugin.json must declare the same pinned dependencies as pyproject.toml and requirements.txt."""
+"""plugin.json, pyproject.toml, requirements.txt and README agree on pins and minimum build."""
 
 import json
 import tomllib
@@ -17,3 +17,11 @@ def test_dependency_pins_agree_across_the_repo():
     manifest = json.loads((ROOT / "plugin.json").read_text())["dependencies"]["pip"]
     assert requirements == pyproject
     assert manifest == pyproject
+
+
+def test_readme_lists_the_pinned_dependencies_and_minimum_build():
+    readme = (ROOT / "README.md").read_text()
+    manifest = json.loads((ROOT / "plugin.json").read_text())
+    for requirement in manifest["dependencies"]["pip"]:
+        assert f"\n   {requirement}\n" in readme, requirement
+    assert f"build {manifest['minimumbinaryninjaversion']} or newer" in readme

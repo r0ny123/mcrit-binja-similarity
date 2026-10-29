@@ -22,7 +22,7 @@ _INDEX_METHOD = "updateMinHashesForSample"
 class SampleClient(JobClient, Protocol):
     mcrit_server: str
 
-    def get_jobs(self, method: str, filter_text: str) -> list[dict[str, Any]]: ...
+    def get_jobs(self, method: str, sample_id: int) -> list[dict[str, Any]]: ...
 
     def get_sample_by_sha256(self, sample_sha256: str) -> dict[str, Any] | None: ...
 
@@ -75,10 +75,9 @@ def _indexes_sample(job: dict[str, Any], sample_id: int) -> bool:
 
 def pending_index_job(client: SampleClient, sample_id: int) -> str | None:
     """Id of a queued or running MinHash indexing job for exactly ``sample_id``."""
-    # MCRIT filters on Job.parameters, "updateMinHashesForSample(<sample_id>)" in 1.8 and 1.9. The
-    # filter is a substring match, so the closing parenthesis keeps sample 7 from matching 70.
+    # A server that ignores sample_ids returns every job of the method.
     states = set()
-    for job in client.get_jobs(_INDEX_METHOD, f"{_INDEX_METHOD}({sample_id})"):
+    for job in client.get_jobs(_INDEX_METHOD, sample_id):
         if not _indexes_sample(job, sample_id):
             continue
         state = job_state(job)

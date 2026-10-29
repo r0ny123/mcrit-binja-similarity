@@ -24,8 +24,9 @@ BUILTIN = "builtin"
 # Older LocalQueues minted job ids that MCRIT's own /jobs routes reject; 1.16 is the oldest checked.
 MINIMUM_MCRIT = (1, 16)
 _INSTALL_HINT = (
-    "Install the mcrit package into Binary Ninja's Python (command palette: "
-    "'Install python3 module', then mcrit), or set the server URL to a running MCRIT server."
+    "Install the mcrit package into Binary Ninja's Python (command palette: 'Install python3 "
+    f"module', then mcrit>={'.'.join(map(str, MINIMUM_MCRIT))}), or set the server URL to a "
+    "running MCRIT server."
 )
 
 
@@ -133,9 +134,8 @@ def _import_problem(exc: ImportError) -> str:
 
 
 def _keep_logging_as_it_is() -> None:
-    # MCRIT calls logging.basicConfig, from import time on, whenever the root logger has no
-    # handler; that would print every library's INFO records. Python's last-resort handler on the root keeps
-    # today's behaviour (warnings to stderr) and makes that call a no-op.
+    # MCRIT calls logging.basicConfig whenever root has no handler, which would print every INFO
+    # record; Python's last-resort handler on root keeps warnings-to-stderr and makes that a no-op.
     if not logging.root.handlers and logging.lastResort is not None:
         logging.root.addHandler(logging.lastResort)
     logging.getLogger("mcrit").setLevel(logging.WARNING)

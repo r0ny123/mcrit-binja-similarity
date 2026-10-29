@@ -25,12 +25,6 @@ class Report:
         return {"sha256": self.sha256}
 
 
-def _parameters(job):
-    """MCRIT's Job.parameters string, e.g. ``updateMinHashesForSample(7)``."""
-    params = json.loads(job["payload"]["params"])
-    return f"{job['payload']['method']}({', '.join(str(v) for v in params.values())})"
-
-
 def _index_job(job_id, sample_id, state, method="updateMinHashesForSample"):
     fields = {
         "queued": {"locked_by": None, "started_at": None, "finished_at": None},
@@ -55,14 +49,18 @@ class FakeClient:
         self.jobs = {}
         self.queue = []
         self.job_queries = []
+        self.honours_sample_ids = True
         self.polled = []
         self.add_existed = False
         self.vs_payload = None
         self.match_result = None
 
-    def get_jobs(self, method, filter_text):
-        self.job_queries.append((method, filter_text))
-        return [job for job in self.queue if filter_text in _parameters(job)]
+    def get_jobs(self, method, sample_id):
+        self.job_queries.append((method, sample_id))
+        jobs = [job for job in self.queue if job["payload"]["method"] == method]
+        if not self.honours_sample_ids:
+            return jobs
+        return [job for job in jobs if json.loads(job["payload"]["params"]).get("0") == sample_id]
 
     def get_sample_by_sha256(self, sample_sha256):
         return self.samples.get(sample_sha256)
@@ -119,7 +117,7 @@ def test_ensure_existing_sample_does_not_upload():
     assert ref.sample_id == 3
     assert ref.existed
     assert client.added == []
-    assert client.job_queries == [("updateMinHashesForSample", "updateMinHashesForSample(3)")]
+    assert client.job_queries == [("updateMinHashesForSample", 3)]
     assert client.polled == []
 
 
@@ -206,6 +204,14 @@ def test_pending_index_job_matches_exact_sample_id():
     assert pending_index_job(client, 7) is None
     assert pending_index_job(client, 17) == "seventeen"
     assert pending_index_job(client, 70) == "seventy"
+
+
+def test_a_server_that_ignores_sample_ids_still_yields_only_this_samples_job():
+    client = FakeClient()
+    client.honours_sample_ids = False
+    client.queue = [_index_job("seventy", 70, "queued"), _index_job("seven", 7, "in_progress")]
+    assert pending_index_job(client, 7) == "seven"
+    assert pending_index_job(client, 17) is None
 
 
 def test_upload_logs_progress_and_waits(caplog):

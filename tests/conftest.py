@@ -380,7 +380,6 @@ def _match_stub_environment(request, monkeypatch):
         return
     from mcrit_similarity import export, log
 
-    # The stub has no user_directory, so the disk cache is off.
     monkeypatch.setattr(export, "_disk_folder", lambda: None)
     # With the real API the plugin logs through Binary Ninja, which caplog cannot see.
     if "caplog" in request.fixturenames:

@@ -1,8 +1,8 @@
 """HTTP client for the MCRIT REST subset used by Binary Similarity.
 
-Method names and routes match core ``mcrit.client.McritClient``. Each thread reuses one
-``requests.Session``, so connections (and TLS handshakes) are pooled without ever sharing
-a Session between overlapping provider visits.
+Routes match core ``mcrit.client.McritClient``. Each thread reuses one ``requests.Session``, so
+connections (and TLS handshakes) are pooled without ever sharing a Session between overlapping
+provider visits.
 """
 
 from __future__ import annotations
@@ -31,12 +31,7 @@ _LOCAL = threading.local()
 
 
 def _send(method: str, url: str, **kwargs: Any) -> requests.Response:
-    """Perform one HTTP request through the calling thread's Session.
-
-    A Session pools connections, but holding one per thread keeps cookies and pool state
-    out of the reach of other threads. One-shot threads pay one Session build, like a
-    one-shot ``requests.request`` did.
-    """
+    """Perform one HTTP request through the calling thread's Session."""
     session = getattr(_LOCAL, "session", None)
     if session is None:
         session = _LOCAL.session = requests.Session()
@@ -202,11 +197,10 @@ class McritClient:
         query = "?compact=True" if compact else ""
         return self._request("GET", f"jobs/{job_id}/result{query}", retry=True)
 
-    def get_jobs(self, method: str, filter_text: str) -> list[dict[str, Any]]:
-        """Jobs of ``method`` whose MCRIT parameter string (``method(arg, ...)``) contains the text."""
-        # MCRIT applies ``filter`` after ``limit``, so no limit is sent.
+    def get_jobs(self, method: str, sample_id: int) -> list[dict[str, Any]]:
+        """Every job of ``method`` whose first argument is ``sample_id``."""
         data = self._request(
-            "GET", "jobs", retry=True, params={"method": method, "filter": filter_text}
+            "GET", "jobs", retry=True, params={"method": method, "sample_ids": str(sample_id)}
         )
         return [job for job in data if isinstance(job, dict)] if isinstance(data, list) else []
 

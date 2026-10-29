@@ -23,6 +23,8 @@ import requests
 from mcrit_similarity import provider as provider_module
 from mcrit_similarity.cache import FUNCTION_OFFSETS
 from mcrit_similarity.export import export_smda_report
+from mcrit_similarity.mcrit import samples
+from mcrit_similarity.mcrit.client import McritClient
 from tests.conftest import FIXTURES, analysed_views
 
 if not hasattr(bn, "SimilaritySession"):
@@ -206,6 +208,13 @@ def test_session_uploads_and_indexes_both_samples(matched):
         entry = stored[report.sha256]
         assert entry["statistics"]["num_functions"] == len(list(report.getFunctions()))
         assert entry["family"] == "zlib"
+
+
+def test_each_samples_index_job_is_found_by_its_sample_id(matched):
+    client = McritClient(matched.server)
+    for entry in _server_samples(matched.server).values():
+        jobs = client.get_jobs(samples._INDEX_METHOD, entry["sample_id"])
+        assert any(samples._indexes_sample(job, entry["sample_id"]) for job in jobs), entry
 
 
 def test_matching_produces_results_within_the_score_range(matched):

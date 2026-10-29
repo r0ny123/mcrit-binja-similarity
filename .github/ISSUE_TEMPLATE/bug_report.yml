@@ -28,6 +28,7 @@ body:
     attributes:
       label: MCRIT server
       options:
+        - Built-in (default)
         - Direct MCRIT API
         - mcritweb
     validations:

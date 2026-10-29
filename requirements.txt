@@ -1,2 +1,3 @@
 smda==5.0.1
 requests
+mcrit==1.16.0

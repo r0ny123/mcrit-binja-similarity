@@ -30,10 +30,8 @@ def test_locked_cache_does_not_cache_empty_by_default():
     val1 = cache.get_or_set("empty_map", factory, cache_empty=False)
     assert val1 == {}
     assert factory.call_count == 1
-    # Because it was empty, it should not be in cache
     assert cache.get("empty_map") is None
 
-    # Calling again should invoke factory again
     factory.return_value = {1: "offset"}
     val2 = cache.get_or_set("empty_map", factory, cache_empty=False)
     assert val2 == {1: "offset"}

@@ -44,7 +44,7 @@ def test_every_field_keeps_its_declared_type_and_range(raw):
         assert isinstance(getattr(config, field), str)
     for field in ("include_library", "persist_samples", "apply_corpus_labels", "query_per_node"):
         assert isinstance(getattr(config, field), bool)
-    assert config.server.endswith("/")
+    assert config.server == "builtin" or config.server.endswith("/")
 
 
 @given(st.dictionaries(st.sampled_from(sorted(ProviderConfig().__dict__)), values, max_size=14))

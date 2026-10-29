@@ -194,9 +194,7 @@ def test_budget_fallback_matches_the_full_pairing_when_order_already_aligns(monk
 
 
 def test_large_functions_take_the_positional_fallback(monkeypatch):
-    # Regression: the cap used to count pairs, and 140x140 leftovers stay under a 20000-pair
-    # budget, so two functions of realistic escaped length spent seconds inside SequenceMatcher
-    # on the render path.
+    # 140x140 leftovers of realistic length must take the positional fallback.
     def side(seed):
         rng = random.Random(seed)
         blocks = []

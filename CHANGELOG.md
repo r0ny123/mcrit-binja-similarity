@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The built-in MCRIT server is now the default, so the plugin works with nothing to set up after installing. Set the server URL under Settings > MCRIT Binary Similarity to use an MCRIT server or mcritweb instead.
+- `mcrit` 1.16.0 is now a required dependency, installed automatically with `smda` and `requests`. It is a large install.
+
+### Fixed
+
+- With MCRIT 1.16 servers, a session could match a sample that MCRIT was still indexing, and never reported a sample that failed to index: the plugin looked up indexing jobs with a filter that 1.16 no longer matches. It now asks for them by sample id.
+- The extension manager description wrote `>` as the HTML entity `&gt;`.
+
 ## [0.1.0] - 2026-10-29
 
 ### Added

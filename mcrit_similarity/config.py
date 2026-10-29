@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from mcrit_similarity.builtin import BUILTIN, is_builtin
 
-DEFAULT_SERVER = "http://127.0.0.1:8000/"
+DEFAULT_SERVER = BUILTIN
 DEFAULT_TIMEOUT = 30
 DEFAULT_MINHASH_THRESHOLD = 50
 DEFAULT_PICHASH_SIZE = 10
