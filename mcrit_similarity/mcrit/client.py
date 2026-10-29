@@ -1,9 +1,8 @@
 """HTTP client for the MCRIT REST subset used by Binary Similarity.
 
-Routes match core ``mcrit.client.McritClient``, whose camelCase method names appear here in
-snake_case. Each thread reuses one
-``requests.Session``, so connections (and TLS handshakes) are pooled without ever sharing
-a Session between overlapping provider visits.
+Routes match core ``mcrit.client.McritClient``. Each thread reuses one ``requests.Session``, so
+connections (and TLS handshakes) are pooled without ever sharing a Session between overlapping
+provider visits.
 """
 
 from __future__ import annotations
@@ -198,11 +197,10 @@ class McritClient:
         query = "?compact=True" if compact else ""
         return self._request("GET", f"jobs/{job_id}/result{query}", retry=True)
 
-    def get_jobs(self, method: str, filter_text: str) -> list[dict[str, Any]]:
-        """Jobs of ``method`` whose MCRIT parameter string (``method(arg, ...)``) contains the text."""
-        # Without a limit, MCRIT returns every job that matches the filter.
+    def get_jobs(self, method: str, sample_id: int) -> list[dict[str, Any]]:
+        """Every job of ``method`` whose first argument is ``sample_id``."""
         data = self._request(
-            "GET", "jobs", retry=True, params={"method": method, "filter": filter_text}
+            "GET", "jobs", retry=True, params={"method": method, "sample_ids": str(sample_id)}
         )
         return [job for job in data if isinstance(job, dict)] if isinstance(data, list) else []
 

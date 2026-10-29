@@ -118,7 +118,7 @@ def test_unexpected_payload_shapes_do_not_leak(payload):
         assert instance.get_version() is None or isinstance(instance.get_version(), str)
         assert instance.get_sample_by_sha256("ab") in (None, payload)
         assert instance.get_job_data("j1") in (None, payload)
-        assert isinstance(instance.get_jobs("m", "f"), list)
+        assert isinstance(instance.get_jobs("m", 1), list)
         assert isinstance(instance.get_functions_by_ids([1]), dict)
 
 
