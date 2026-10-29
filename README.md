@@ -7,7 +7,7 @@
 
 Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja's [Binary Similarity](https://docs.binary.ninja/guide/similarity.html) sessions, next to BinDiff and WARP. Match two binaries, review the pairs side by side, and carry names and types across, all from Binary Ninja's own similarity UI.
 
-![An MCRIT match rendered side by side as Pseudo C in Binary Ninja, changed lines in orange, above the session's MCRIT results](docs/rendered-diff.png)
+![Screenshot of an MCRIT match rendered side by side as Pseudo C in Binary Ninja, changed lines in orange, above the session's MCRIT results.](docs/rendered-diff.png)
 
 ## Features
 
@@ -18,6 +18,8 @@ Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja'
 - **Apply.** Copy names, types, variables and comments from the matched function, and optionally name unnamed functions after their MCRIT label.
 - **Confidence reflects ambiguity.** It drops when another candidate scores close to the best one.
 - **x86, x86_64 and aarch64** binaries.
+
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 For the MCRIT sidebar that browses a corpus inside IDA, Binary Ninja or Ghidra, see the [MCRIT plugin](https://github.com/familiary/mcrit-plugin). The two install side by side.
 
@@ -86,9 +88,9 @@ Open B's node to list the matches, and type `MCRIT` in the search box to keep on
 
 A quick sanity check: functions that have the same name on both sides should match themselves.
 
-![A session on the built-in server: the two binaries, MCRIT's matches ranked by similarity, and the log of the upload and match](docs/session.png)
+![Screenshot of a session on the built-in server: the two binaries, MCRIT's matches ranked by similarity, and the log of the upload and match.](docs/session.png)
 
-![The graph view of a match: blocks only the O2 build has in green, changed instructions in orange](docs/graph-diff.png)
+![Screenshot of a match in the graph view: blocks only the O2 build has in green, changed instructions in orange.](docs/graph-diff.png)
 
 > [!TIP]
 > For a session with MCRIT alone, remove the other providers under **Configuration**, then save the setup with `Profiles > Save Current as Profile...` for the next Quick Setup. `Add Provider > MCRIT` adds it to a session you set up by hand.
@@ -195,6 +197,8 @@ Binary Ninja's [similarity troubleshooting guide](https://docs.binary.ninja/guid
 | A session option changed under Configuration has no effect | Binary Ninja 6.0 only passes on options changed in the same dialog that added MCRIT. Select MCRIT, **Remove Provider**, **Add Provider**, change the options, then close the dialog. |
 | Two sets of MCRIT settings | The **MCRIT** group belongs to the MCRIT plugin; this plugin's is **MCRIT Binary Similarity**. |
 
+For anything else, [open an issue](https://github.com/r0ny123/mcrit-binja-similarity/issues/new/choose).
+
 ## Development
 
 ```bash
@@ -220,7 +224,7 @@ MCRIT_TEST_REAL_BINARYNINJA=1 MCRIT_TEST_E2E=1 python -m pytest tests -m e2e
 - `MCRIT_E2E_SERVER_URL` uses a server you run instead. The tests reset it with `POST /respawn`, so never point it at data you want to keep.
 - `MCRIT_E2E_STORAGE=mongodb` runs against MCRIT's deployed shape, MongoDB plus a worker (`MCRIT_E2E_MONGO_HOST`, `MCRIT_E2E_MONGO_PORT`, `MCRIT_E2E_MONGO_DB`).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the rest.
+Maintained by [r0ny123](https://github.com/r0ny123). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
