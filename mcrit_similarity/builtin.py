@@ -24,8 +24,8 @@ BUILTIN = "builtin"
 # Older LocalQueues minted job ids that MCRIT's own /jobs routes reject; 1.16 is the oldest checked.
 MINIMUM_MCRIT = (1, 16)
 _INSTALL_HINT = (
-    "Install the mcrit package into Binary Ninja's Python (command palette: "
-    "'Install python3 module', then mcrit), or set the server URL to a running MCRIT server."
+    "Install the mcrit package into Binary Ninja's Python (command palette: 'Install python3 "
+    "module', then mcrit==1.16.0), or set the server URL to a running MCRIT server."
 )
 
 

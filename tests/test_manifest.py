@@ -1,4 +1,4 @@
-"""plugin.json, pyproject.toml, requirements.txt and the README must agree on pins and minimum build."""
+"""plugin.json, pyproject.toml, requirements.txt and README agree on pins and minimum build."""
 
 import json
 import tomllib

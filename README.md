@@ -29,7 +29,7 @@ Binary Ninja **Ultimate** 6.0, build 10601 or newer. Binary Similarity is an Ult
 
 ## Install
 
-**From the extension manager:** `Plugins > Manage Extensions`, search for **MCRIT Similarity**, and click **Install**. Binary Ninja installs the Python packages it needs (`smda`, `requests` and `mcrit`, about 190 MB with numpy, scipy and lief). Restart Binary Ninja, and it is ready to use.
+**From the extension manager**, once the plugin is listed there: `Plugins > Manage Extensions`, search for **MCRIT Similarity**, and click **Install**. Binary Ninja installs the Python packages it needs (`smda`, `requests` and `mcrit`, about 190 MB with numpy, scipy and lief). Restart Binary Ninja, and it is ready to use.
 
 **From a clone:**
 
