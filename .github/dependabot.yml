@@ -8,7 +8,8 @@ updates:
       actions:
         patterns:
           - "*"
-  # Bumps the pins in pyproject.toml and requirements.txt; CI fails until plugin.json and the README's install list match.
+  # Bumps the pins in pyproject.toml and requirements.txt; CI fails until plugin.json
+  # and the README's install list match.
   - package-ecosystem: pip
     directory: /
     schedule:
