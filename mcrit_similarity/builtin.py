@@ -18,7 +18,7 @@ import types
 from dataclasses import dataclass
 
 from mcrit_similarity.errors import McritUnavailableError
-from mcrit_similarity.log import log_info
+from mcrit_similarity.log import log_error, log_info
 
 BUILTIN = "builtin"
 # Older LocalQueues minted job ids that MCRIT's own /jobs routes reject; 1.16 is the oldest checked.
@@ -44,13 +44,30 @@ def is_builtin(server: str) -> bool:
     return server.strip().lower() == BUILTIN
 
 
-def endpoint() -> Endpoint:
-    """The built-in server, started on first use; callers wait while it starts."""
+def endpoint(corpus: str = "") -> Endpoint:
+    """The built-in server, started on first use with ``corpus`` loaded; callers wait meanwhile."""
     global _endpoint
     with _lock:
         if _endpoint is None:
-            _endpoint = _start()
+            started = _start()
+            if corpus:
+                _load_corpus(started, corpus)
+            _endpoint = started
         return _endpoint
+
+
+def _load_corpus(started: Endpoint, path: str) -> None:
+    from mcrit_similarity.corpus import import_file, import_summary
+    from mcrit_similarity.errors import McritError
+    from mcrit_similarity.mcrit.client import McritClient
+
+    try:
+        report = import_file(McritClient(started.url, apitoken=started.token, timeout=None), path)
+    except (McritError, OSError) as exc:
+        # Matching still works against what sessions upload.
+        log_error(f"The built-in MCRIT server could not load the corpus {path}: {exc}")
+        return
+    log_info(import_summary(report, path))
 
 
 def _version(text: str) -> tuple[int, ...]:
@@ -88,6 +105,9 @@ def _start() -> Endpoint:
     # identical results.
     McritConfig.MINHASH_CONFIG.MINHASH_POOL_INDEXING = False
     McritConfig.MINHASH_CONFIG.MINHASH_POOL_MATCHING = False
+    # Memory storage cannot feed vectorised scoring: every match would try it, log a warning and
+    # fall back to the same per-pair scoring.
+    McritConfig.MINHASH_CONFIG.MINHASH_MATCHING_VECTORIZED = False
 
     try:
         from mcrit.server.application_routes import get_app

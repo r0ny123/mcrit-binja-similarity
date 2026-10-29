@@ -8,7 +8,7 @@ __all__ = ["__version__"]
 def _register() -> None:
     from binaryninja import BinaryViewType, PluginCommand, core_product
 
-    from mcrit_similarity.commands import COMMAND_NAME, run_connection_check
+    from mcrit_similarity import commands
     from mcrit_similarity.log import log_info
     from mcrit_similarity.settings import register_global_settings
 
@@ -22,9 +22,31 @@ def _register() -> None:
 
     McritProviderType().register()
     BinaryViewType.add_binaryview_initial_analysis_completion_event(_preload_in_background)
-    # Global: the check needs no open file.
+    # Global: these need no open file.
     PluginCommand.register_global(
-        COMMAND_NAME, "Check the MCRIT server URL and API token", run_connection_check
+        commands.COMMAND_NAME,
+        "Check the MCRIT server URL and API token",
+        commands.run_connection_check,
+    )
+    PluginCommand.register_global(
+        commands.IMPORT_COMMAND,
+        "Load an MCRIT export file into the built-in server",
+        commands.run_corpus_import,
+    )
+    PluginCommand.register_global(
+        commands.EXPORT_COMMAND,
+        "Save the built-in server's corpus as an MCRIT export file",
+        commands.run_corpus_export,
+    )
+    PluginCommand.register(
+        commands.ADD_COMMAND,
+        "Upload this binary to the MCRIT corpus with a family and version",
+        commands.run_add_binary,
+    )
+    PluginCommand.register_for_function(
+        commands.MATCHES_COMMAND,
+        "Match this function against the whole MCRIT corpus",
+        commands.run_corpus_matches,
     )
     log_info("Registered MCRIT Binary Similarity provider")
 

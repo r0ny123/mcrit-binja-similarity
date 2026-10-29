@@ -108,6 +108,17 @@ def register_global_settings() -> None:
             "description": "HTTP timeout in seconds.",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
+        "builtin_corpus": {
+            "title": "Built-in corpus",
+            "type": "string",
+            "default": "",
+            "description": (
+                "MCRIT export file loaded when the built-in server starts, such as one saved "
+                "with Export Built-in Corpus or written by mcrit client export."
+            ),
+            "uiSelectionAction": "file",
+            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
+        },
     }
     for key, properties in declarations.items():
         if not settings.register_setting(f"{GROUP}.{key}", json.dumps(properties)):
@@ -158,6 +169,11 @@ def global_defaults() -> ProviderConfig:
             settings.get_integer(f"{GROUP}.timeout")
             if settings.contains(f"{GROUP}.timeout")
             else DEFAULT_TIMEOUT
+        ),
+        "builtin_corpus": (
+            settings.get_string(f"{GROUP}.builtin_corpus")
+            if settings.contains(f"{GROUP}.builtin_corpus")
+            else ""
         ),
     }
     return config_from_values(values)

@@ -542,6 +542,34 @@ def test_query_per_node_serves_two_incoming_nodes_from_the_builtin_server(x86_vi
             gc.collect()
 
 
+def test_a_function_is_found_in_the_builtin_corpus_after_adding_its_binary(x86_views):
+    import importlib.util
+
+    if importlib.util.find_spec("mcrit.config") is None:
+        pytest.skip("a Binary Ninja plugin folder named mcrit hides the mcrit package here")
+    from mcrit_similarity.commands import add_to_corpus, function_matches
+    from mcrit_similarity.config import ProviderConfig
+    from mcrit_similarity.render import smda_function
+
+    reference, target = x86_views
+    config = ProviderConfig(server="builtin")
+    reference_report: Any = export_smda_report(reference)
+    ok, message = add_to_corpus(config, reference_report, "zlib", "O2")
+    assert ok, message
+    target_report: Any = export_smda_report(target)
+    for name in KNOWN_FUNCTIONS:
+        (symbol,) = target.get_symbols_by_name(name)
+        found = function_matches(
+            config, target_report, smda_function(target_report, symbol.address)
+        )
+        assert all(match.sha256 != target_report.sha256 for match in found)
+        (namesake,) = reference.get_symbols_by_name(name)
+        assert any(
+            match.sha256 == reference_report.sha256 and match.function_offset == namesake.address
+            for match in found
+        ), f"{name}: {found}"
+
+
 def test_the_headless_example_runs_against_the_server(matched, monkeypatch, capsys):
     """examples/headless_mcrit.py stays in step with the API it demonstrates."""
     script = FIXTURES.parent.parent / "examples" / "headless_mcrit.py"

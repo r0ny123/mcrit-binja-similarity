@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Show Corpus Matches** on a function lists every function in the MCRIT corpus that matches it, with score, family, version and sample.
+- **Add Binary to Corpus...** uploads the open binary with a family and version.
+- **Export Built-in Corpus...** and **Import Corpus into Built-in Server...** save the built-in server's samples to a file and load one, including exports from any MCRIT server.
+- The **Built-in corpus** setting names an export file to load whenever the built-in server starts.
+
+### Fixed
+
+- The built-in server logged a warning about vectorised scoring for every match. MCRIT's in-memory storage cannot score that way, so the built-in server no longer tries; results are unchanged.
+
 ## [0.2.0] - 2026-10-29
 
 ### Changed
