@@ -152,11 +152,11 @@ class McritProviderType(SimilarityProviderType):
         if not config.server:
             log_error("MCRIT server URL is empty")
             return None
-        return McritProvider(self, config)
+        return McritProvider(self, config, settings_obj)
 
 
 class McritProvider(SimilarityProvider):
-    def __init__(self, provider_type: McritProviderType, config: ProviderConfig):
+    def __init__(self, provider_type: McritProviderType, config: ProviderConfig, settings_obj=None):
         super().__init__(provider_type=provider_type)
         self._lock = threading.Lock()
         # (server, sha256) -> SampleRef. Per provider, not per process: a server that was reset
@@ -165,6 +165,7 @@ class McritProvider(SimilarityProvider):
         # Edges into one node can be visited concurrently; each must see the other's new entities.
         self._entity_locks: dict[int, threading.Lock] = {}
         self._config = config
+        self._settings = settings_obj
         # (target node id, target entity id) -> MCRIT label of the matched function
         self._labels: dict[tuple[int, int], str] = {}
 
@@ -181,7 +182,30 @@ class McritProvider(SimilarityProvider):
             return False
         with self._lock:
             self._config = config
+            self._settings = settings_obj
         return True
+
+    def _current_config(self) -> ProviderConfig:
+        """The configuration as the provider's settings hold it now.
+
+        Binary Ninja's session Configuration dialog writes changes made right after Add Provider
+        into the settings the provider was created with, without calling perform_update_settings.
+        """
+        with self._lock:
+            settings_obj, config = self._settings, self._config
+        if settings_obj is None:
+            return config
+        try:
+            # The last configuration stands in for the global defaults, which would read the
+            # keychain on every visit and every apply.
+            fresh = config_from_settings(settings_obj, config)
+        except Exception:
+            return config
+        if not fresh.server:
+            return config
+        with self._lock:
+            self._config = fresh
+        return fresh
 
     def perform_visit_node(self, node, results, completion) -> bool:
         # All results are written from edge visits; there is nothing to do per node.
@@ -324,8 +348,7 @@ class McritProvider(SimilarityProvider):
             log_error("MCRIT visit requires active views on both edge endpoints")
             return False
 
-        with self._lock:
-            config = self._config
+        config = self._current_config()
 
         def should_stop() -> bool:
             return completion.is_stop_requested
@@ -459,24 +482,26 @@ class McritProvider(SimilarityProvider):
         return f"{name} ({label})"
 
     def perform_apply(self, node, entity, result) -> SimilarityApplyStatus:
-        with self._lock:
-            enabled = self._config.apply_corpus_labels
-        match = node.get_result(result) if enabled else None
-        label = self._label(match.target) if match is not None else ""
-        function = node.get_entity_function(entity) if label else None
-        # A real target name is more specific than a corpus label, and the default apply copies it.
+        function = node.get_entity_function(entity)
+        # A real target name is what the default apply should copy.
         if function is None or not _target_has_default_name(node, result):
             return super().perform_apply(node, entity, result)
+        enabled = self._current_config().apply_corpus_labels
+        match = node.get_result(result) if enabled else None
+        label = self._label(match.target) if match is not None else ""
         view = function.view
         start = function.start
         unnamed = view.get_symbol_at(start) is None
         status = super().perform_apply(node, entity, result)
         if status != SimilarityApplyStatus.SimilarityApplySuccess or not unnamed:
             return status
-        # The default apply copies the target's name, placeholders included, as an auto symbol.
+        # The default apply copies the target's placeholder name, such as sub_140005480, as an auto
+        # symbol, which names an address in the other binary.
         symbol = view.get_symbol_at(start)
-        if symbol is None or symbol.auto:
+        if label and (symbol is None or symbol.auto):
             function.name = label
+        elif symbol is not None and symbol.auto:
+            view.undefine_auto_symbol(symbol)
         return status
 
     def perform_render(self, node, entity, context, result) -> None:

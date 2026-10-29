@@ -576,6 +576,16 @@ def test_the_builtin_server_matches_with_nothing_to_set_up(x86_views):
         matched_names = {_entity_name(target_node, entity_id) for entity_id, _, _ in results}
         assert set(KNOWN_FUNCTIONS) <= matched_names
 
+        # Unnamed on both sides: the default apply would name the source after the target's
+        # address, such as sub_100001a40 on a function elsewhere.
+        entity_id, result_id, result = results[0]
+        source = target_node.get_entity_function(entity_id)
+        matched = reference_node.get_entity_function(result.target.entity_id)
+        for function in (source, matched):
+            function.view.undefine_auto_symbol(function.view.get_symbol_at(function.start))
+        status = provider.apply(target_node, entity_id, result_id)
+        assert status == bn.SimilarityApplyStatus.SimilarityApplySuccess
+        assert source.view.get_symbol_at(source.start) is None
     finally:
         del session, reference_node, target_node, provider
         gc.collect()

@@ -265,23 +265,29 @@ def _apply(provider_type, config, *, before=None, after=None, base_status=None, 
     node = _session_node(target, "sub_2000", NamedFunction("sub_2000", target_symbol))
     node.get_entity_function = lambda entity_id: source
     with patch.object(SimilarityProvider, "perform_apply", side_effect=base_apply):
-        return provider.perform_apply(node, 1, 5), source.renamed_to
+        status = provider.perform_apply(node, 1, 5)
+    undefined = source.view.undefine_auto_symbol.call_args_list
+    return status, source.renamed_to, [call.args[0] for call in undefined]
 
 
-def test_apply_renames_unnamed_source_only_when_enabled(provider_type):
+def test_apply_replaces_a_copied_placeholder_name(provider_type):
     ok = SimilarityApplyStatus.SimilarityApplySuccess
+    off = ProviderConfig()
     on = ProviderConfig(apply_corpus_labels=True)
-    assert _apply(provider_type, ProviderConfig()) == (ok, None)
-    assert _apply(provider_type, on) == (ok, "CryptEncrypt_wrapper")
-    # The default apply copied the target's name as an auto symbol: the label replaces it.
-    assert _apply(provider_type, on, after=AUTO) == (ok, "CryptEncrypt_wrapper")
-    assert _apply(provider_type, on, after=USER) == (ok, None)
-    assert _apply(provider_type, on, before=AUTO) == (ok, None)
-    # A real target name is what the default apply copies; the label must not replace it.
-    assert _apply(provider_type, on, target_symbol=AUTO) == (ok, None)
-    assert _apply(provider_type, on, target_symbol=USER) == (ok, None)
+    assert _apply(provider_type, off) == (ok, None, [])
+    # The default apply copied the target's placeholder name: it is dropped, or the label wins.
+    assert _apply(provider_type, off, after=AUTO) == (ok, None, [AUTO])
+    assert _apply(provider_type, on, after=AUTO) == (ok, "CryptEncrypt_wrapper", [])
+    assert _apply(provider_type, on) == (ok, "CryptEncrypt_wrapper", [])
+    # A name the user set, or one the source already had, stays.
+    assert _apply(provider_type, off, after=USER) == (ok, None, [])
+    assert _apply(provider_type, on, after=USER) == (ok, None, [])
+    assert _apply(provider_type, on, before=AUTO, after=AUTO) == (ok, None, [])
+    # A real target name is what the default apply copies; nothing replaces it.
+    assert _apply(provider_type, on, target_symbol=AUTO) == (ok, None, [])
+    assert _apply(provider_type, off, target_symbol=USER) == (ok, None, [])
     failed = SimilarityApplyStatus.SimilarityApplyFailed
-    assert _apply(provider_type, on, base_status=failed) == (failed, None)
+    assert _apply(provider_type, on, base_status=failed) == (failed, None, [])
 
 
 def test_function_name_falls_back_to_the_default_name_for_a_real_report():
@@ -376,3 +382,49 @@ def test_each_node_has_its_own_entity_lock(provider_type):
     provider = McritProvider(provider_type, ProviderConfig())
     assert provider._entity_lock(1) is provider._entity_lock(1)
     assert provider._entity_lock(1) is not provider._entity_lock(2)
+
+
+class _LiveSettings:
+    """A provider's settings, edited in place as the Configuration dialog does right after Add Provider."""
+
+    def __init__(self, values):
+        self.values = values
+
+    def contains(self, key):
+        return key in self.values
+
+    def get_string(self, key):
+        return self.values[key]
+
+    get_bool = get_integer = get_string
+
+
+def _no_keychain():
+    raise AssertionError("re-reading the session settings must not read the keychain")
+
+
+def test_settings_edited_in_place_reach_the_next_visit_and_apply(provider_type, monkeypatch):
+    monkeypatch.setattr("mcrit_similarity.provider.global_defaults", _no_keychain)
+    live = _LiveSettings({"mcrit_similarity.server": "builtin"})
+    provider = McritProvider(provider_type, ProviderConfig(server="builtin", api_token="t"), live)
+    live.values.update(
+        {
+            "mcrit_similarity.server": "http://127.0.0.1:9",
+            "mcrit_similarity.minhash_threshold": 70,
+            "mcrit_similarity.apply_corpus_labels": True,
+        }
+    )
+    config = provider._current_config()
+    assert (config.server, config.minhash_threshold) == ("http://127.0.0.1:9/", 70)
+    assert config.apply_corpus_labels is True
+    assert config.api_token == "t"
+
+
+def test_unreadable_settings_keep_the_last_good_configuration(provider_type):
+    class Broken(_LiveSettings):
+        def contains(self, key):
+            raise RuntimeError("settings handle released")
+
+    config = ProviderConfig(server="https://mcrit.example/")
+    provider = McritProvider(provider_type, config, Broken({}))
+    assert provider._current_config() is config
