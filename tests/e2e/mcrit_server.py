@@ -15,25 +15,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import secrets
 import signal
 import sys
-import types
 from http import HTTPStatus
 
 READY_PREFIX = "MCRIT_E2E_READY "
 FAIL_PATH_ENV = "MCRIT_E2E_FAIL_PATH"
 FAIL_COUNT_ENV = "MCRIT_E2E_FAIL_COUNT"
 FAIL_STATUS_ENV = "MCRIT_E2E_FAIL_STATUS"
-
-
-def _use_short_hex_ids() -> None:
-    # /jobs/{id} and /results/{id} only route 24-character hex ids, while the fake queue mints
-    # uuid4 strings, which those routes answer with HTTP 400. Still the case on mcrit 1.9.0, so
-    # this patch can go once LocalQueue and JobResource agree on an id format upstream.
-    from mcrit.queue import LocalQueue
-
-    setattr(LocalQueue, "uuid", types.SimpleNamespace(uuid4=lambda: secrets.token_hex(12)))
 
 
 def _with_failure_hook(app):
@@ -72,7 +61,6 @@ def configure(storage: str, host: str, port: int, database: str) -> None:
     if storage == "memory":
         McritConfig.STORAGE_CONFIG.STORAGE_METHOD = StorageFactory.STORAGE_METHOD_MEMORY
         McritConfig.QUEUE_CONFIG.QUEUE_METHOD = QueueFactory.QUEUE_METHOD_FAKE
-        _use_short_hex_ids()
         return
     McritConfig.STORAGE_CONFIG.STORAGE_METHOD = StorageFactory.STORAGE_METHOD_MONGODB
     McritConfig.QUEUE_CONFIG.QUEUE_METHOD = QueueFactory.QUEUE_METHOD_MONGODB

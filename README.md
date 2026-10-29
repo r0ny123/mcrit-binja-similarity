@@ -37,11 +37,20 @@ This is a session provider for comparing binaries. For the MCRIT sidebar that br
 
 3. Restart Binary Ninja. The log shows `Registered MCRIT Binary Similarity provider`.
 
-4. Open Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity`, and set the server URL: `http://127.0.0.1:8000/` for a local MCRIT API, or `https://<host>/api/` plus username and API token for mcritweb. Then run `Plugins > MCRIT Similarity > Test Server Connection`: it checks the URL and token without starting a session.
+4. Open Settings (`Cmd+,` / `Ctrl+,`), search for `mcrit_similarity`, and set the server URL: `builtin` to run MCRIT inside Binary Ninja (see below), `http://127.0.0.1:8000/` for a local MCRIT API, or `https://<host>/api/` plus username and API token for mcritweb. Then run `Plugins > MCRIT Similarity > Test Server Connection`: it checks the URL and token without starting a session.
+
+## No server: built-in MCRIT
+
+Set the server URL to `builtin` and the plugin runs MCRIT inside Binary Ninja, with no Docker, MongoDB or account. It needs the `mcrit` package in Binary Ninja's Python: command palette, `Install python3 module`, then `mcrit` (or `mcrit` in place of `-r requirements.txt` in the pip command from step 2). That install is large, since MCRIT brings numpy, scipy and lief.
+
+- Samples are kept in memory until Binary Ninja exits, so each run uploads and indexes them again. Two binaries of a few thousand functions take seconds.
+- It matches only the binaries in your sessions. Matching against a shared corpus, with its labels and families, needs a server.
+- MCRIT runs in a single process and listens only on 127.0.0.1, behind a token generated for each run.
+- Stopping a session takes effect once the sample being indexed or matched is done.
 
 ## Get an MCRIT server
 
-The plugin is a client; it needs a running MCRIT server. The quickest one is [docker-mcrit](https://github.com/familiary/docker-mcrit):
+For a corpus that persists and is shared, the plugin connects to an MCRIT server. The quickest one is [docker-mcrit](https://github.com/familiary/docker-mcrit):
 
 ```bash
 git clone https://github.com/familiary/docker-mcrit && cd docker-mcrit
@@ -69,7 +78,7 @@ Settings > **MCRIT Binary Similarity** (user scope):
 
 | Setting | Meaning |
 |---|---|
-| Server URL | Default `http://127.0.0.1:8000/` |
+| Server URL | Default `http://127.0.0.1:8000/`; `builtin` runs MCRIT inside Binary Ninja |
 | Username | `username` header for mcritweb |
 | API token | Moved into the system keychain on first use; the field then reads empty. Enter a new token to replace it |
 | Request timeout | Seconds per HTTP request |
@@ -97,7 +106,7 @@ Per-session options live in the session's Configuration dialog: MinHash threshol
 
 ## How matching works
 
-Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the SHA256 of that report. For PE files this is the hash of the mapped image SMDA exports, which can differ from the file's own SHA256, so a sample already on the server under its file hash is uploaded again as a separate sample. An unknown sample is uploaded only when *persist samples* is on, with no family unless you set one. It is on by default for a local server and off for a remote one, because an upload sends the binary's disassembly to that server; turn it on per session when you mean to. With it off, the visit fails with a log message naming the server. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
+Each view is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the SHA256 of that report. For PE files this is the hash of the mapped image SMDA exports, which can differ from the file's own SHA256, so a sample already on the server under its file hash is uploaded again as a separate sample. An unknown sample is uploaded only when *persist samples* is on, with no family unless you set one. It is on by default for a local server, always on for the built-in one, and off for a remote one, because an upload sends the binary's disassembly to that server; turn it on per session when you mean to. With it off, the visit fails with a log message naming the server. Matching then runs MCRIT's MatcherVs, and only the matched functions are fetched afterwards.
 
 Confidence reflects how unique a match is: a tie with another candidate halves it, a lead of 10+ points keeps it, and a PicHash match gets 255 only when no other function shares that PicHash. A result is named after the target's MCRIT function label when the target has no symbol, or `name (label)` when both differ.
 
@@ -139,6 +148,7 @@ Binary Ninja's own [troubleshooting guide](https://docs.binary.ninja/guide/simil
 - **Log warns `MCRIT applied different matching parameters than requested`** — the server (mcritweb in particular) ignored or capped the MinHash threshold, PicHash size or LSH bands you set; the warning lists each as `requested -> applied`. Point the plugin at the direct API to use your values.
 - **No matches between different architectures** — expected: MCRIT 1.13+ matches within one architecture only.
 - **Render warns `no SMDA report is cached` after a restart** — re-run the session; reports reload in the background once analysis finishes.
+- **`cannot import the mcrit package: the module named mcrit at … is something else`** — a Binary Ninja plugin folder named `mcrit` takes the package's name. Rename that folder, for example to `mcrit-plugin`.
 - **Settings look duplicated** — that is the MCRIT disassembler plugin's own **MCRIT** group; this plugin's settings are under **MCRIT Binary Similarity**.
 
 ## Development

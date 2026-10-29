@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import json
 
+from mcrit_similarity.builtin import is_builtin
 from mcrit_similarity.config import (
     DEFAULT_BAND_MATCHES,
     DEFAULT_MAX_RESULTS,
@@ -29,7 +30,12 @@ KEYCHAIN_PROVIDER = "SystemSecretsProvider"
 _GROUP_TITLE = "MCRIT Binary Similarity"
 
 _PROVIDER_SCHEMA = (
-    ("server", "string", DEFAULT_SERVER, "MCRIT server URL for this session."),
+    (
+        "server",
+        "string",
+        DEFAULT_SERVER,
+        "MCRIT server URL for this session, or builtin to run MCRIT inside Binary Ninja.",
+    ),
     ("minhash_threshold", "number", DEFAULT_MINHASH_THRESHOLD, "Minimum MinHash score (0-100)."),
     ("pichash_size", "number", DEFAULT_PICHASH_SIZE, "Minimum function size for PicHash matches."),
     (
@@ -44,7 +50,7 @@ _PROVIDER_SCHEMA = (
         "persist_samples",
         "boolean",
         True,
-        "Upload missing samples so MatcherVs can run; an upload sends the binary's disassembly to the server. On by default for a local server, off for a remote one. Required unless both SHA256s are already on the server.",
+        "Upload missing samples so MatcherVs can run; an upload sends the binary's disassembly to the server. On by default for a local server, always on for the built-in one, off for a remote one. Required unless both SHA256s are already on the server.",
     ),
     (
         "apply_corpus_labels",
@@ -73,7 +79,7 @@ def register_global_settings() -> None:
             "title": "Server URL",
             "type": "string",
             "default": DEFAULT_SERVER,
-            "description": "Default MCRIT server URL.",
+            "description": "Default MCRIT server URL, or builtin to run MCRIT inside Binary Ninja.",
             "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
         },
         "username": {
@@ -165,7 +171,10 @@ def default_provider_settings():
     except Exception:
         current_server = DEFAULT_SERVER
 
-    dynamic_defaults = {"server": current_server, "persist_samples": is_loopback(current_server)}
+    dynamic_defaults = {
+        "server": current_server,
+        "persist_samples": is_builtin(current_server) or is_loopback(current_server),
+    }
     for key, type_name, default, description in _PROVIDER_SCHEMA:
         eff_default = dynamic_defaults.get(key, default)
         properties = {

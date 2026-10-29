@@ -21,6 +21,7 @@ from binaryninja.similarity import (
 from mcrit_similarity import PROVIDER_NAME
 from mcrit_similarity.cache import FUNCTION_OFFSETS, LockedCache
 from mcrit_similarity.config import ProviderConfig
+from mcrit_similarity.connection import client_for, resolve
 from mcrit_similarity.errors import McritError, McritJobError
 from mcrit_similarity.export import export_smda_report
 from mcrit_similarity.log import log_debug, log_error, log_info, log_warn
@@ -170,16 +171,6 @@ class McritProvider(SimilarityProvider):
     def _entity_lock(self, node_id: int) -> threading.Lock:
         with self._lock:
             return self._entity_locks.setdefault(node_id, threading.Lock())
-
-    def _client(self) -> McritClient:
-        with self._lock:
-            config = self._config
-        return McritClient(
-            config.server,
-            apitoken=config.api_token or None,
-            username=config.username or None,
-            timeout=config.timeout,
-        )
 
     def perform_update_settings(self, settings_obj) -> bool:
         try:
@@ -353,7 +344,8 @@ class McritProvider(SimilarityProvider):
         to_report = export_smda_report(to_view, should_stop=should_stop)
         advance(0.32)
 
-        client = self._client()
+        config = resolve(config)
+        client = client_for(config)
         from_sample = self._sample(client, config, from_report, should_stop, span(0.32, 0.42))
         advance(0.42)
         to_sample = self._sample(client, config, to_report, should_stop, span(0.42, 0.52))

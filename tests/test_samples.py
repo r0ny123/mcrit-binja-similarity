@@ -267,3 +267,16 @@ def test_a_dict_report_is_uploaded_with_blank_labels():
     client = FakeClient()
     ensure_sample(client, {"sha256": "ab", "metadata": {"family": "old"}}, persist=True)
     assert client.added[-1]["metadata"] == {"family": "", "version": ""}
+
+
+@pytest.mark.parametrize(
+    ("server", "level"),
+    [("http://127.0.0.1:8000/", logging.INFO), ("https://mcrit.example/", logging.WARNING)],
+)
+def test_only_an_upload_to_a_remote_server_is_a_warning(caplog, server, level):
+    client = FakeClient()
+    client.mcrit_server = server
+    with caplog.at_level(logging.INFO):
+        ensure_sample(client, Report("c" * 64), persist=True)
+    (record,) = [record for record in caplog.records if "Uploading" in record.getMessage()]
+    assert record.levelno == level

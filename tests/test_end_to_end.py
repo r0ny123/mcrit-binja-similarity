@@ -481,6 +481,7 @@ def test_stopping_a_running_session_finishes_it(x86_views, own_server):
 
 def test_query_per_node_serves_two_incoming_nodes(x86_views, own_server):
     reference, target = x86_views
+    provider_module.CORPUS_MATCHES.clear()
     with analysed_views("zlib-arm64-O2") as (other,):
         session = None
         provider = _make_provider(own_server, query_per_node=True)
@@ -492,6 +493,36 @@ def test_query_per_node_serves_two_incoming_nodes(x86_views, own_server):
                 provider, [(reference_node, target_node), (other_node, target_node)]
             )
             assert len(_server_samples(own_server)) == 3
+            # A failed corpus query falls back to MatcherVs per edge and caches nothing.
+            assert len(provider_module.CORPUS_MATCHES._items) == 1
+            matched_names = {
+                _entity_name(target_node, entity_id)
+                for entity_id, _result_id, _result in _results(target_node)
+            }
+            assert set(KNOWN_FUNCTIONS) <= matched_names
+        finally:
+            del session, other_node, reference_node, target_node, provider
+            gc.collect()
+
+
+def test_query_per_node_serves_two_incoming_nodes_from_the_builtin_server(x86_views):
+    import importlib.util
+
+    if importlib.util.find_spec("mcrit.config") is None:
+        pytest.skip("a Binary Ninja plugin folder named mcrit hides the mcrit package here")
+    reference, target = x86_views
+    provider_module.CORPUS_MATCHES.clear()
+    with analysed_views("zlib-arm64-O2") as (other,):
+        session = None
+        provider = _make_provider("builtin", query_per_node=True)
+        reference_node = bn.SimilaritySessionNode(reference)
+        other_node = bn.SimilaritySessionNode(other)
+        target_node = bn.SimilaritySessionNode(target)
+        try:
+            session = _run_edges(
+                provider, [(reference_node, target_node), (other_node, target_node)]
+            )
+            assert len(provider_module.CORPUS_MATCHES._items) == 1
             matched_names = {
                 _entity_name(target_node, entity_id)
                 for entity_id, _result_id, _result in _results(target_node)
@@ -525,3 +556,26 @@ def test_the_headless_example_runs_against_the_server(matched, monkeypatch, caps
         settings.set_string("mcrit_similarity.server", previous)
     lines = capsys.readouterr().out.splitlines()
     assert any(line.startswith("_deflate -> _deflate:") for line in lines), lines[-5:]
+
+
+def test_the_builtin_server_matches_with_nothing_to_set_up(x86_views):
+    import importlib.util
+
+    if importlib.util.find_spec("mcrit.config") is None:
+        pytest.skip("a Binary Ninja plugin folder named mcrit hides the mcrit package here")
+    reference, target = x86_views
+    session = None
+    # Uploads off on purpose: the built-in server starts empty, so it always uploads.
+    provider = _make_provider("builtin", persist_samples=False)
+    reference_node = bn.SimilaritySessionNode(reference)
+    target_node = bn.SimilaritySessionNode(target)
+    try:
+        session = _run_edges(provider, [(reference_node, target_node)])
+        results = _results(target_node)
+        assert len(results) >= MIN_RESULTS
+        matched_names = {_entity_name(target_node, entity_id) for entity_id, _, _ in results}
+        assert set(KNOWN_FUNCTIONS) <= matched_names
+
+    finally:
+        del session, reference_node, target_node, provider
+        gc.collect()

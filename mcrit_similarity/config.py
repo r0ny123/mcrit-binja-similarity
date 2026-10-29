@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mcrit_similarity.builtin import BUILTIN, is_builtin
+
 DEFAULT_SERVER = "http://127.0.0.1:8000/"
 DEFAULT_TIMEOUT = 30
 DEFAULT_MINHASH_THRESHOLD = 50
@@ -77,7 +79,9 @@ def config_from_values(
 ) -> ProviderConfig:
     base = defaults or ProviderConfig()
     server = _as_str(values.get("server"), base.server).strip() or base.server
-    if server and not server.endswith("/"):
+    if is_builtin(server):
+        server = BUILTIN
+    elif not server.endswith("/"):
         server += "/"
     return ProviderConfig(
         server=server,

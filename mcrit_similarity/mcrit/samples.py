@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from mcrit_similarity.errors import McritError, McritUnavailableError
 from mcrit_similarity.log import log_info, log_warn
+from mcrit_similarity.mcrit.client import is_loopback
 from mcrit_similarity.mcrit.jobs import JobClient, StopFn, await_job, job_state, resolve_matches
 
 ProgressFn = Callable[[float], None]
@@ -153,7 +154,9 @@ def ensure_sample(
     payload["metadata"] = {**payload.get("metadata", {}), "family": family, "version": version}
     filename = getattr(smda_report, "filename", "") or "sample"
     count = getattr(smda_report, "num_functions", "?")
-    log_warn(
+    # The disassembly only leaves this machine for a remote server.
+    notify = log_info if is_loopback(client.mcrit_server) else log_warn
+    notify(
         f"Uploading {filename} (sha256 {sha256[:12]}…, {count} functions) "
         f"to MCRIT at {client.mcrit_server}"
     )

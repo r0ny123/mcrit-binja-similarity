@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import threading
 
+from mcrit_similarity.builtin import is_builtin
 from mcrit_similarity.config import ProviderConfig
+from mcrit_similarity.connection import client_for, resolve
 from mcrit_similarity.errors import McritError
 from mcrit_similarity.log import log_error, log_info
-from mcrit_similarity.mcrit.client import McritClient
 from mcrit_similarity.settings import global_defaults
 
 COMMAND_NAME = "MCRIT Similarity\\Test Server Connection"
@@ -16,17 +17,13 @@ COMMAND_NAME = "MCRIT Similarity\\Test Server Connection"
 def check_connection(config: ProviderConfig) -> tuple[bool, str]:
     """Ask the server for its version, which mcritweb only answers for a valid token."""
     try:
-        client = McritClient(
-            config.server,
-            apitoken=config.api_token or None,
-            username=config.username or None,
-            timeout=config.timeout,
-        )
+        client = client_for(resolve(config))
         version = client.get_version()
     except McritError as exc:
         return False, str(exc)
     suffix = f" (MCRIT {version})" if version else ""
-    return True, f"Connected to {client.mcrit_server}{suffix}"
+    where = "the built-in MCRIT server" if is_builtin(config.server) else client.mcrit_server
+    return True, f"Connected to {where}{suffix}"
 
 
 def run_connection_check(_view=None) -> None:

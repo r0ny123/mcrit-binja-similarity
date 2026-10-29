@@ -21,7 +21,9 @@ dependencies = [
 # hypothesis is pinned exactly: a new release can change how it generates examples,
 # which would make a property failure reproduce on one machine and not the next.
 dev = ["pytest", "ruff", "ty", "hypothesis==6.170.9"]
-# Only the end-to-end tests need an MCRIT server; it is a heavy install.
+# The built-in server runs MCRIT inside Binary Ninja; it is a heavy install.
+builtin = ["mcrit==1.16.0"]
+# The end-to-end tests launch MCRIT servers of their own.
 e2e = ["mcrit==1.16.0"]
 
 [tool.ruff]
