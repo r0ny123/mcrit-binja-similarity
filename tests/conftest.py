@@ -187,7 +187,9 @@ elif "binaryninja" not in sys.modules:
             (),
             {"add_binaryview_initial_analysis_completion_event": staticmethod(lambda cb: None)},
         ),
-        PluginCommand=type("PluginCommand", (), {"register": staticmethod(lambda *args: None)}),
+        PluginCommand=type(
+            "PluginCommand", (), {"register_global": staticmethod(lambda *args: None)}
+        ),
         log=bn_log,
         similarity=bn_sim,
         enums=bn_enums,

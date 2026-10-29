@@ -137,10 +137,11 @@ def test_mid_size_functions_keep_the_instruction_level_diff(views):
 
 
 @ultimate
-def test_connection_check_command_is_registered():
+def test_connection_check_needs_no_open_file():
     from mcrit_similarity.commands import COMMAND_NAME
 
-    assert COMMAND_NAME in {command.name for command in bn.PluginCommand}
+    commands = {command.name: command for command in bn.PluginCommand}
+    assert commands[COMMAND_NAME].type == bn.PluginCommandType.GlobalPluginCommand
 
 
 # View events cannot be unregistered, so one forwarder is registered per process and only

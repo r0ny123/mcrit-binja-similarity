@@ -22,7 +22,8 @@ def _register() -> None:
 
     McritProviderType().register()
     BinaryViewType.add_binaryview_initial_analysis_completion_event(_preload_in_background)
-    PluginCommand.register(
+    # Global: the check needs no open file, and the README has users run it before opening one.
+    PluginCommand.register_global(
         COMMAND_NAME, "Check the MCRIT server URL and API token", run_connection_check
     )
     log_info("Registered MCRIT Binary Similarity provider")

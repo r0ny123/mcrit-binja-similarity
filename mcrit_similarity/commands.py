@@ -26,7 +26,7 @@ def check_connection(config: ProviderConfig) -> tuple[bool, str]:
     return True, f"Connected to {where}{suffix}"
 
 
-def run_connection_check(_view=None) -> None:
+def run_connection_check() -> None:
     """Check the configured server off the UI thread and report in the log and a message box."""
 
     def run() -> None:
