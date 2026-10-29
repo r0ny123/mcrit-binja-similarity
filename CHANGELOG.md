@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
 ### Changed
 
 - The built-in MCRIT server is now the default, so the plugin works with nothing to set up after installing. Set the server URL under Settings > MCRIT Binary Similarity to use an MCRIT server or mcritweb instead.
@@ -39,5 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A token is only sent over HTTPS, or HTTP to a loopback address; redirects and credentials in the server URL are refused.
 - The built-in server listens only on 127.0.0.1 and accepts only requests carrying a token generated for each Binary Ninja run.
 
-[Unreleased]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/r0ny123/mcrit-binja-similarity/releases/tag/v0.1.0
