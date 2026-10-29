@@ -130,7 +130,7 @@ def test_corpus_label_always_returns_a_string(labels):
 
 
 def test_non_finite_numbers_are_dropped_not_raised():
-    # Regression: int(float("inf")) raises OverflowError, which the except clauses missed.
+    # int(float("inf")) raises OverflowError, not ValueError.
     inf = float("inf")
 
     def parse_row(row):

@@ -23,14 +23,12 @@ def test_token_rejected_over_insecure_http():
     with pytest.raises(McritAuthError, match="Cannot transmit API token over unencrypted HTTP"):
         McritClient("http://mcrit.corp.example.com", apitoken="secret")
 
-    # Loopback addresses must be allowed
     c1 = McritClient("http://127.0.0.1:8000", apitoken="secret")
     assert c1.headers["apitoken"] == "secret"
 
     c2 = McritClient("http://localhost:8000", apitoken="secret")
     assert c2.headers["apitoken"] == "secret"
 
-    # HTTPS must be allowed for remote
     c3 = McritClient("https://mcrit.corp.example.com", apitoken="secret")
     assert c3.headers["apitoken"] == "secret"
 

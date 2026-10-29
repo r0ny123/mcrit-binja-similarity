@@ -1,6 +1,7 @@
 """HTTP client for the MCRIT REST subset used by Binary Similarity.
 
-Method names and routes match core ``mcrit.client.McritClient``. Each thread reuses one
+Routes match core ``mcrit.client.McritClient``, whose camelCase method names appear here in
+snake_case. Each thread reuses one
 ``requests.Session``, so connections (and TLS handshakes) are pooled without ever sharing
 a Session between overlapping provider visits.
 """
@@ -31,12 +32,7 @@ _LOCAL = threading.local()
 
 
 def _send(method: str, url: str, **kwargs: Any) -> requests.Response:
-    """Perform one HTTP request through the calling thread's Session.
-
-    A Session pools connections, but holding one per thread keeps cookies and pool state
-    out of the reach of other threads. One-shot threads pay one Session build, like a
-    one-shot ``requests.request`` did.
-    """
+    """Perform one HTTP request through the calling thread's Session."""
     session = getattr(_LOCAL, "session", None)
     if session is None:
         session = _LOCAL.session = requests.Session()
@@ -204,7 +200,7 @@ class McritClient:
 
     def get_jobs(self, method: str, filter_text: str) -> list[dict[str, Any]]:
         """Jobs of ``method`` whose MCRIT parameter string (``method(arg, ...)``) contains the text."""
-        # MCRIT applies ``filter`` after ``limit``, so no limit is sent.
+        # Without a limit, MCRIT returns every job that matches the filter.
         data = self._request(
             "GET", "jobs", retry=True, params={"method": method, "filter": filter_text}
         )

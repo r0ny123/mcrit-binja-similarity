@@ -354,8 +354,7 @@ jobs:
                       sys.exit(f"license field {key!r} spans lines and cannot be masked")
                   print(f"::add-mask::{value}")
 
-      # MCRIT reads its MongoDB settings from dataclass defaults, so the launcher sets them
-      # from these; the test fixtures start and stop every server and worker themselves.
+      # The test fixtures start and stop every server and worker themselves.
       - name: Pytest end-to-end (MongoDB-backed MCRIT)
         if: steps.config.outputs.method != 'none'
         timeout-minutes: 20

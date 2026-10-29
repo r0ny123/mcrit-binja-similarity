@@ -42,16 +42,12 @@ def test_range_for_block():
     bb = FakeBasicBlock(0x1000, 0x1020)
     func = FakeFunction(0x1000, None, [bb])
 
-    # Direct hit at start of BB
     assert _range_for_block(func, 0x1000, 10) == (0x1000, 0x1020)
 
-    # Offset inside BB
     assert _range_for_block(func, 0x1008, 8) == (0x1000, 0x1020)
 
-    # Offset outside any BB
     assert _range_for_block(func, 0x2000, 16) == (0x2000, 0x2010)
 
-    # Size <= 0 clamps to 1
     assert _range_for_block(func, 0x2000, 0) == (0x2000, 0x2001)
 
 

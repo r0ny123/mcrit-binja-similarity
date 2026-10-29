@@ -8,6 +8,6 @@ Only the latest release and `main` receive fixes.
 
 ## Scope
 
-In scope: this plugin's handling of the API token, its connection to the MCRIT server (TLS, redirects, which data is uploaded), and parsing of server responses and cached SMDA reports.
+In scope: this plugin's handling of the API token, its connection to the MCRIT server (TLS, redirects, which data is uploaded), the built-in server's loopback-only listener and per-run token, and parsing of server responses and cached SMDA reports.
 
 Out of scope: vulnerabilities in the MCRIT server or mcritweb ([familiary/mcrit](https://github.com/familiary/mcrit)), SMDA ([danielplohmann/smda](https://github.com/danielplohmann/smda)), or Binary Ninja itself; report those to their maintainers.

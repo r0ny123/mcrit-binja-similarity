@@ -112,7 +112,7 @@ _PRELOAD_LOCK = threading.Lock()
 
 def _warm_architecture(bv) -> str | None:
     # Binary Ninja builds its Python Architecture wrapper (~150-250 ms) on first use and caches it
-    # process-wide. Exporting used to pay this; with stored reports it would land on the UI thread.
+    # process-wide; warming it here keeps that cost off the UI thread.
     arch = bv.arch
     return arch.name if arch is not None else None
 
@@ -185,7 +185,6 @@ def _load_small(bv, key: tuple[str, int]) -> object | None:
 def _build_report(bv) -> object:
     from smda.binja.BinjaExporter import exportBinaryView
 
-    # SMDA raises a bare ValueError for other architectures.
     smda_architecture(bv.arch.name)
     # Capstone often cannot decode a few malware bytes; that is a skip, not a failed export.
     logging.getLogger("smda.export.Exporter").setLevel(logging.ERROR)

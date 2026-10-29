@@ -19,4 +19,4 @@ class McritUnavailableError(McritError):
 
 
 class UnsupportedArchitectureError(McritError):
-    """SMDA's Binary Ninja exporter only lifts intel and aarch64."""
+    """The architecture has no SMDA export."""

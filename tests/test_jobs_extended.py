@@ -11,7 +11,7 @@ QUEUED = {"started_at": None, "locked_by": None, "finished_at": None, "attempts_
 
 
 def test_running_job_without_progress_changes_is_not_abandoned():
-    """MCRIT only reports progress between 10000-function batches, so a busy job looks idle."""
+    """A busy MCRIT job can report no progress for a long time."""
     client = Mock()
     client.get_job_data.side_effect = [{**RUNNING, "progress": 0}] * 50 + [
         {**RUNNING, "finished_at": "t", "result": "r"}

@@ -109,7 +109,7 @@ def parse_vs_result(
     limit = max(1, int(max_results))
     for offset in grouped:
         ranked = sorted(grouped[offset], key=_match_sort_key)
-        # One pass for the top two scores and the PicHash count; no full score sort.
+        # ranked puts PicHash matches first, so the top two scores need their own pass.
         candidates = len(ranked)
         best_score = None
         runner_up_score = None

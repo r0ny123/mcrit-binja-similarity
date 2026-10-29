@@ -71,7 +71,7 @@ def test_uniqueness_weight_rules():
 
 
 def test_nan_score_maps_to_zero():
-    # Regression: round(nan) raised ValueError, and json.loads accepts a bare NaN literal.
+    # round(nan) raises ValueError, and json.loads accepts a bare NaN literal.
     assert similarity_from_minhash(float("nan")) == 0
     assert confidence_from_match(float("nan"), IS_MINHASH_FLAG, 128.0) == 0
 

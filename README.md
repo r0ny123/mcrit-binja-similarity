@@ -29,7 +29,7 @@ Binary Ninja **Ultimate** 6.0, build 10601 or newer. Binary Similarity is an Ult
 
 ## Install
 
-**From the extension manager:** `Plugins > Manage Extensions`, search for **MCRIT Similarity**, and click **Install**. Binary Ninja installs the Python packages it needs (`smda`, `requests` and `mcrit`, about 480 MB with numpy, scipy and lief). Restart Binary Ninja, and it is ready to use.
+**From the extension manager:** `Plugins > Manage Extensions`, search for **MCRIT Similarity**, and click **Install**. Binary Ninja installs the Python packages it needs (`smda`, `requests` and `mcrit`, about 190 MB with numpy, scipy and lief). Restart Binary Ninja, and it is ready to use.
 
 **From a clone:**
 
@@ -87,7 +87,7 @@ Then run `Plugins > MCRIT Similarity > Test Server Connection`. It reports the s
 3. Pick a profile. **Review matches first** runs MCRIT next to BinDiff and WARP. **Apply matches automatically** adds a resolver that applies the best match by itself.
 4. Let Quick Setup run the session, or press **Start**.
 
-Open B's node to list the matches, and type `MCRIT` in the search box to keep only this provider's. **Render** shows the selected pair under **Rendered Result**; **Apply** copies the match into B, except placeholder names such as `sub_140005480`. Both offer to open the binaries if they are not open.
+Select B's node in the session graph to list its matches, and type `MCRIT` in the search box to keep only this provider's. **Render** shows the selected pair under **Rendered Result**; **Apply** copies the match into B, except placeholder names such as `sub_140005480`. Both offer to open the binaries if they are not open.
 
 A quick sanity check: functions that have the same name on both sides should match themselves.
 
@@ -96,7 +96,7 @@ A quick sanity check: functions that have the same name on both sides should mat
 ![Screenshot of a match in the graph view: blocks only the O2 build has in green, changed instructions in orange.](docs/graph-diff.png)
 
 > [!TIP]
-> For a session with MCRIT alone, remove the other providers under **Configuration**, then save the setup with `Profiles > Save Current as Profile...` for the next Quick Setup. `Add Provider > MCRIT` adds it to a session you set up by hand.
+> For a session with MCRIT alone, remove the other providers under **Configuration**, then save the setup with **Save Current as Profile...** under **Profiles** in the same dialog, for the next Quick Setup. `Add Provider > MCRIT` adds it to a session you set up by hand.
 
 ## The built-in server
 
@@ -148,13 +148,13 @@ SecretsProvider["SystemSecretsProvider"].delete_data("mcrit_similarity.api_token
 
 Each binary is exported to an SMDA report from Binary Ninja's analysis and looked up on the server by the report's SHA256. For PE files that is the hash of the mapped image, which can differ from the file's own hash, so a sample already on the server under its file hash is uploaded again. MCRIT's MatcherVs then matches the pair, and only the matched functions are fetched.
 
-**Uploads.** An unknown sample is uploaded only when *persist samples* is on. That is the default for local and built-in servers. For remote servers it is off, because an upload sends the binary's disassembly to that server; turn it on per session when you mean to.
+**Uploads.** An unknown sample is uploaded only when *persist samples* is on. It is on by default for local servers and always on for the built-in one. For remote servers it is off, because an upload sends the binary's disassembly to that server; turn it on per session when you mean to.
 
 **Scores.** MCRIT's 0–100 score maps to Binary Ninja's 0–255. A tie with another candidate halves the confidence, a lead of 10 points or more keeps it, and a PicHash match gets full confidence only when no other function shares that PicHash. A result is named after the target's MCRIT label when the target has no symbol.
 
 **Rendering.** The two functions are aligned by PicBlock hash, and leftover blocks are paired by instruction similarity. Only the instructions that differ are marked, and functions that are identical stay unpainted. This works in the Graph and Linear views for every view type the selector offers: Disassembly, Low/Medium/High Level IL, and Pseudo C, Objective-C and Rust.
 
-**Cache.** SMDA reports are cached under `<Binary Ninja user folder>/mcrit_similarity/smda_reports` (512 MiB or 1000 files, least recently used removed first). After a restart, reports up to 64 MiB reload in the background once analysis finishes. Delete the folder to clear it.
+**Cache.** SMDA reports are cached under `<Binary Ninja user folder>/mcrit_similarity/smda_reports` (512 MiB or 1000 files, least recently used removed first). After a restart, reports for binaries up to 64 MiB reload in the background once analysis finishes. Delete the folder to clear it.
 
 ## Security
 
@@ -231,7 +231,7 @@ Maintained by [r0ny123](https://github.com/r0ny123). Contributions are welcome: 
 
 ## License
 
-[GPL-3.0-only](LICENSE), matching the MCRIT projects it works with. The plugin talks to MCRIT over REST, or runs the separately installed `mcrit` package, and contains none of its code.
+[GPL-3.0-only](LICENSE), matching the MCRIT projects it works with. The plugin talks to MCRIT over REST, or runs the `mcrit` package it installs as a dependency, and contains none of its code.
 
 | Component | License | Use |
 |---|---|---|

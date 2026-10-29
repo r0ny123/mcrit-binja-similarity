@@ -45,8 +45,7 @@ def is_match_result(payload: Any) -> bool:
 
 
 def job_failed(job: dict[str, Any]) -> bool:
-    # A spent attempt counter only means failure while the job has not finished: Job.complete()
-    # writes finished_at before result, and that gap must not be read as a failure.
+    # A written result means the job completed, whatever its attempt counter says.
     return job_state(job) == "failed" and job.get("result") is None
 
 
@@ -100,8 +99,8 @@ def await_job(
 ) -> Any:
     """Poll until the job finishes or is stopped.
 
-    There is no timeout on a running job: MCRIT only advances ``progress`` between matching
-    batches of 10000 functions, so a healthy job can look idle for its whole run. A dead worker
+    There is no timeout on a running job: MCRIT steps ``progress`` only once per 1000-function
+    banding chunk, so a healthy job can look idle for a long time. A dead worker
     is MCRIT's to reclaim, which moves the job back to queued or to failed.
     """
     delay = sleep_s

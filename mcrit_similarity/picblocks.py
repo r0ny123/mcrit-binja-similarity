@@ -10,11 +10,8 @@ from difflib import SequenceMatcher
 
 # Below this ratio two escaped blocks are unrelated rather than a changed version of each other.
 _CHANGED_RATIO = 0.5
-# Scoring one pair costs O(len(a)*len(b)), so the total is the product of the two sides' escaped
-# lengths. Past this many character comparisons, fall back to positional pairing so a render
-# callback cannot stall the UI thread. Two builds of the same mid-size function measure around
-# 10 ms per million here, which puts the cap near a third of a second; text that defeats
-# SequenceMatcher's cheap bounds costs several times that, so this is a ceiling, not a promise.
+# Character comparisons (product of both sides' escaped lengths, ~10 ms per million) allowed
+# before falling back to positional pairing, so a render callback cannot stall the UI thread.
 _FUZZY_WORK_BUDGET = 40_000_000
 
 

@@ -19,9 +19,9 @@
         "Windows"
     ],
     "installinstructions": {
-        "Darwin": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then add the MCRIT provider in a Similarity Session (Ultimate).",
-        "Linux": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then add the MCRIT provider in a Similarity Session (Ultimate).",
-        "Windows": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then add the MCRIT provider in a Similarity Session (Ultimate)."
+        "Darwin": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then start a session with File > New Similarity Session (Ultimate); MCRIT is part of the Quick Setup profiles.",
+        "Linux": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then start a session with File > New Similarity Session (Ultimate); MCRIT is part of the Quick Setup profiles.",
+        "Windows": "Python dependencies (smda, requests, mcrit) are installed automatically; mcrit is a large install. MCRIT runs inside Binary Ninja by default. To use a server instead, set Settings > MCRIT Binary Similarity > Server URL. Then start a session with File > New Similarity Session (Ultimate); MCRIT is part of the Quick Setup profiles."
     },
     "dependencies": {
         "pip": [

@@ -103,8 +103,7 @@ def test_a_single_gap_does_not_end_the_wait(sleeps):
 
 
 def test_result_written_after_finished_at_is_waited_for(sleeps):
-    # Regression: attempts_left == 0 on an already finished job was read as a failure, so the
-    # documented two-step Job.complete() could be reported as a crashed job.
+    # attempts_left == 0 on a finished job is not a failure.
     late = dict(FINISHED_NO_RESULT, attempts_left=0)
     client = FakeClient([late, late, dict(FINISHED, attempts_left=0)])
     assert await_job(client, "j1", max_consecutive_missing=5) == RESULT

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The built-in MCRIT server is now the default, so the plugin works straight after a one-click install from the extension manager. Set the server URL under Settings > MCRIT Binary Similarity to use an MCRIT server or mcritweb instead.
-- `mcrit` 1.16.0 is now a required dependency, installed automatically with `smda` and `requests`. It is a large install, about 480 MB.
+- `mcrit` 1.16.0 is now a required dependency, installed automatically with `smda` and `requests`. It is a large install.
 
 ### Fixed
 
