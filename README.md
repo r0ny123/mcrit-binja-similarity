@@ -65,12 +65,12 @@ The first `up` builds both images and takes a while. Register the first account 
 
 ## Run a session
 
-1. `File > New Similarity Session`.
-2. Quick Setup: pick the reference binary A and the binary B to find matches in. This creates the edge `A -> B`.
-3. `Configuration > Add Provider > MCRIT`. BinDiff and WARP can join the same session, and the Metric Similarity Resolver applies the best match automatically.
-4. `Start`.
+1. `File > New Similarity Session`, then `Quick Setup`.
+2. Pick the reference binary A and the binary B to find matches in (`Browse files...` if they are not open). This creates the edge `A -> B`.
+3. Pick a profile. *Review matches first* runs MCRIT next to BinDiff and WARP; *Apply matches automatically* adds the Metric Similarity Resolver, which applies the best match by itself. For a session with MCRIT alone, remove the other providers under `Configuration`, where `Add Provider > MCRIT` also adds it to a session set up by hand; `Profiles > Save Current as Profile...` keeps that setup for the next Quick Setup.
+4. Run the session when Quick Setup offers to, or with `Start`.
 
-Every function in B gets its best MCRIT match in A, with MCRIT's 0–100 score mapped to Binary Ninja's 0–255 similarity scale. `Apply` copies names, types, variable info and comments from the matched function, like the built-in providers. Functions whose name both sides share (check a few known ones) should match themselves — that is the quickest way to confirm the setup works.
+Every function in B gets its best MCRIT match in A, with MCRIT's 0–100 score mapped to Binary Ninja's 0–255 similarity scale. Open B's node to list the results; typing `MCRIT` in the search box keeps only this provider's. `Render` shows the pair side by side under `Rendered Result`, and `Apply` copies names, types, variable info and comments from the matched function, like the built-in providers; both ask to open the binaries first if they are not. A placeholder name such as `sub_140005480` is not copied, since it names an address in the other binary. Functions whose name both sides share (check a few known ones) should match themselves — that is the quickest way to confirm the setup works.
 
 ## Settings
 
@@ -149,6 +149,7 @@ Binary Ninja's own [troubleshooting guide](https://docs.binary.ninja/guide/simil
 - **No matches between different architectures** — expected: MCRIT 1.13+ matches within one architecture only.
 - **Render warns `no SMDA report is cached` after a restart** — re-run the session; reports reload in the background once analysis finishes.
 - **`cannot import the mcrit package: the module named mcrit at … is something else`** — a Binary Ninja plugin folder named `mcrit` takes the package's name. Rename that folder, for example to `mcrit-plugin`.
+- **A session option changed under `Configuration` has no effect** — Binary Ninja 6.0 passes MCRIT's per-session options on only when they are changed in the same Configuration dialog in which MCRIT was added. Select MCRIT there, `Remove Provider`, `Add Provider`, change the options, then close the dialog. Server URL, username, API token and timeout also have defaults under Settings > MCRIT Binary Similarity.
 - **Settings look duplicated** — that is the MCRIT disassembler plugin's own **MCRIT** group; this plugin's settings are under **MCRIT Binary Similarity**.
 
 ## Development
