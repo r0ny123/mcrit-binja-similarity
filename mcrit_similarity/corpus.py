@@ -63,13 +63,43 @@ def too_small(name: str, function: Any) -> str:
     )
 
 
+# The binary's identity and layout scalars; everything else report-wide (symbols, exports,
+# header bytes, data references, metadata) stays on this machine.
+_QUERY_FIELDS = (
+    "architecture",
+    "abi",
+    "base_addr",
+    "binary_size",
+    "bitness",
+    "confidence_threshold",
+    "execution_time",
+    "identified_alignment",
+    "message",
+    "sha256",
+    "smda_version",
+    "status",
+    "timestamp",
+)
+
+
 def single_function_report(report: Any, function: Any) -> dict[str, Any]:
     """``report`` reduced to ``function``: MCRIT's function query takes exactly one."""
     reduced = copy.copy(report)
     reduced.xcfg = {function.offset: function}
-    # Data references span the whole binary and play no part in function matching.
-    reduced.data_refs_from = {}
-    return reduced.toDict()
+    # Dropped before serialising only to keep it cheap; the allowlist is what bounds the payload.
+    reduced.data_refs_from = reduced.data_refs_to = reduced.xmetadata = reduced.buffer = None
+    full = reduced.toDict()
+    query = {key: full[key] for key in _QUERY_FIELDS if key in full}
+    # SmdaReport.fromDict requires these keys, empty or not.
+    query.update(
+        xcfg=full["xcfg"],
+        metadata={},
+        code_areas=[],
+        code_sections=[],
+        disassembly_errors={},
+        xheader="",
+    )
+    return query
 
 
 @dataclass(frozen=True)

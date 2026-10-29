@@ -143,6 +143,36 @@ def test_functions_mcrit_cannot_hash_are_explained(instructions, expected):
     assert corpus.too_small("f", function) == expected
 
 
+def test_a_function_query_carries_only_that_function_and_the_binarys_identity():
+    smda = pytest.importorskip("smda.Disassembler")
+    from smda.common.SmdaReport import SmdaReport
+
+    report = smda.Disassembler().disassembleFile(
+        str(ROOT / "tests" / "fixtures" / "zlib-x86_64-Os")
+    )
+    function = max(report.getFunctions(), key=lambda f: f.num_instructions)
+    report.data_refs_to = {1: [2]}
+    report.xmetadata = {"symbols": ["secret"]}
+    report.xheader = b"MZ"
+    query = corpus.single_function_report(report, function)
+    assert set(query) == {
+        *corpus._QUERY_FIELDS,
+        "xcfg",
+        "metadata",
+        "code_areas",
+        "code_sections",
+        "disassembly_errors",
+        "xheader",
+    }
+    assert list(query["xcfg"]) == [function.offset]
+    assert query["metadata"] == {} and query["xheader"] == ""
+    assert "secret" not in json.dumps(query)
+    # MCRIT and mcritweb both parse the query with SmdaReport.fromDict.
+    parsed = SmdaReport.fromDict(json.loads(json.dumps(query)))
+    assert parsed is not None and parsed.sha256 == report.sha256
+    assert report.xmetadata == {"symbols": ["secret"]}
+
+
 def test_an_incompatible_export_is_an_error():
     client = McritClient("http://127.0.0.1:1/")
     with (
