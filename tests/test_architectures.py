@@ -8,8 +8,10 @@ def test_supported_arches():
     assert smda_architecture("x86") == "intel"
     assert smda_architecture("x86_64") == "intel"
     assert smda_architecture("aarch64") == "aarch64"
+    assert smda_architecture("armv7") == "arm"
+    assert smda_architecture("thumb2") == "arm"
 
 
 def test_rejects_unexportable_arches():
-    with pytest.raises(UnsupportedArchitectureError, match="armv7"):
-        smda_architecture("armv7")
+    with pytest.raises(UnsupportedArchitectureError, match="armv7eb"):
+        smda_architecture("armv7eb")

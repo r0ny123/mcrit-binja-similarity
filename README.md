@@ -17,7 +17,7 @@ Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja'
 - **Side-by-side diffs.** Render any match in the Graph or Linear view, as disassembly, IL or pseudo-code. Changed lines are orange, removed red, added green.
 - **Apply.** Copy names, types, variables and comments from the matched function, and optionally name unnamed functions after their MCRIT label.
 - **Confidence reflects ambiguity.** It drops when another candidate scores close to the best one.
-- **x86, x86_64 and aarch64** binaries.
+- **x86, x86_64, aarch64 and 32-bit ARM** (ARM and Thumb-2, little-endian) binaries.
 
 What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -52,7 +52,7 @@ Binary Ninja **Ultimate** 6.0, build 10601 or newer. Binary Similarity is an Ult
 2. Install the Python packages. Open the command palette (`Cmd+P` / `Ctrl+P`), run `Install python3 module`, and enter one package per line:
 
    ```text
-   smda==5.0.1
+   smda==5.0.2
    requests
    mcrit==1.16.0
    ```

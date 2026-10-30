@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for 32-bit ARM binaries (ARM and Thumb-2, little-endian), with `smda` 5.0.2.
+
 ## [0.2.0] - 2026-10-29
 
 ### Changed
