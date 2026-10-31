@@ -18,7 +18,7 @@ import types
 from dataclasses import dataclass
 
 from mcrit_similarity.errors import McritUnavailableError
-from mcrit_similarity.log import log_info
+from mcrit_similarity.log import log_error, log_info
 
 BUILTIN = "builtin"
 # Older LocalQueues minted job ids that MCRIT's own /jobs routes reject; 1.16 is the oldest checked.
@@ -38,19 +38,39 @@ class Endpoint:
 
 _lock = threading.Lock()
 _endpoint: Endpoint | None = None
+# The corpus file that failed to load at start, which an export must not overwrite.
+unloaded_corpus = ""
 
 
 def is_builtin(server: str) -> bool:
     return server.strip().lower() == BUILTIN
 
 
-def endpoint() -> Endpoint:
-    """The built-in server, started on first use; callers wait while it starts."""
+def endpoint(corpus: str = "") -> Endpoint:
+    """The built-in server, started on first use with ``corpus`` loaded; callers wait meanwhile."""
     global _endpoint
     with _lock:
         if _endpoint is None:
-            _endpoint = _start()
+            started = _start()
+            if corpus:
+                _load_corpus(started, corpus)
+            _endpoint = started
         return _endpoint
+
+
+def _load_corpus(started: Endpoint, path: str) -> None:
+    global unloaded_corpus
+    from mcrit_similarity.corpus import import_file, import_summary
+    from mcrit_similarity.mcrit.client import McritClient
+
+    try:
+        report = import_file(McritClient(started.url, apitoken=started.token, timeout=None), path)
+    except Exception as exc:
+        # The server is already running; matching still works against what sessions upload.
+        unloaded_corpus = path
+        log_error(f"The built-in MCRIT server could not load the corpus {path}: {exc}")
+        return
+    log_info(import_summary(report, path))
 
 
 def _version(text: str) -> tuple[int, ...]:

@@ -204,6 +204,21 @@ class McritClient:
         )
         return [job for job in data if isinstance(job, dict)] if isinstance(data, list) else []
 
+    def export_corpus(self) -> dict[str, Any]:
+        data = self._request("GET", "export", params={"compress": "true"})
+        if not isinstance(data, dict):
+            raise McritHttpError("MCRIT export returned no data")
+        return data
+
+    def import_corpus(self, body: bytes) -> dict[str, Any]:
+        data = self._request("POST", "import", data=body)
+        # MCRIT answers null when the export's shingler or MinHash configuration differs.
+        if not isinstance(data, dict):
+            raise McritHttpError(
+                "MCRIT refused the import: the export comes from an incompatible MCRIT configuration"
+            )
+        return data
+
     def get_functions_by_ids(self, function_ids: list[int]) -> dict[int, dict[str, Any]]:
         """Function entries without xcfg. The body is comma-separated ids, as MCRIT expects."""
         mapped: dict[int, dict[str, Any]] = {}

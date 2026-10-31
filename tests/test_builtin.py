@@ -39,7 +39,7 @@ def test_a_server_url_resolves_to_itself():
 
 
 def test_builtin_resolves_to_the_running_server(monkeypatch):
-    monkeypatch.setattr(builtin, "endpoint", lambda: ENDPOINT)
+    monkeypatch.setattr(builtin, "endpoint", lambda corpus="": ENDPOINT)
     config = ProviderConfig(
         server="builtin", api_token="user", username="me", persist_samples=False, timeout=5
     )
@@ -115,7 +115,7 @@ def test_a_plugin_folder_named_mcrit_is_named_as_the_cause(fresh, monkeypatch):
 
 
 def test_the_connection_check_starts_and_reaches_the_builtin_server(monkeypatch):
-    monkeypatch.setattr(builtin, "endpoint", lambda: ENDPOINT)
+    monkeypatch.setattr(builtin, "endpoint", lambda corpus="": ENDPOINT)
     response = types.SimpleNamespace(
         status_code=200, json=lambda: {"status": "successful", "data": {"version": "1.16.0"}}
     )

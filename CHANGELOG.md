@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for 32-bit ARM binaries (ARM and Thumb-2, little-endian), with `smda` 5.0.2.
+- **Export Built-in Corpus...** and **Import Corpus into Built-in Server...** save the built-in server's samples to a file and load one, including exports from any MCRIT server. Sessions then find binaries already indexed and skip uploading them again.
+- The **Built-in corpus** setting names an export file to load whenever the built-in server starts.
 
 ## [0.2.0] - 2026-10-29
 
