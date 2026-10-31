@@ -158,7 +158,6 @@ def test_the_real_server_spawns_no_processes_and_prints_no_progress(running):
 
     assert McritConfig.MINHASH_CONFIG.MINHASH_POOL_INDEXING is False
     assert McritConfig.MINHASH_CONFIG.MINHASH_POOL_MATCHING is False
-    assert McritConfig.MINHASH_CONFIG.MINHASH_MATCHING_VECTORIZED is False
     for name in ("mcrit.Worker", "mcrit.matchers.MatcherInterface"):
         assert sys.modules[name].tqdm.tqdm.keywords == {"disable": True}
 

@@ -54,6 +54,7 @@ def test_the_corpus_setting_is_read_and_passed_to_the_builtin_server(monkeypatch
 @pytest.fixture
 def fresh(monkeypatch):
     monkeypatch.setattr(builtin, "_endpoint", None)
+    monkeypatch.setattr(builtin, "unloaded_corpus", "")
     monkeypatch.setattr(builtin, "_start", lambda: ENDPOINT)
 
 
@@ -69,6 +70,37 @@ def test_an_unreadable_corpus_leaves_the_server_running(fresh, tmp_path, caplog)
     missing = tmp_path / "missing.json"
     assert builtin.endpoint(str(missing)) is ENDPOINT
     assert f"could not load the corpus {missing}" in caplog.text
+    assert builtin.unloaded_corpus == str(missing)
+
+
+def test_an_export_cannot_replace_the_corpus_that_failed_to_load(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert commands._same_file("c.json", str(tmp_path / "c.json"))
+    assert not commands._same_file("c.json", "")
+    assert not commands._same_file("c.json", str(tmp_path / "d.json"))
+
+
+class _Exporting:
+    def export_corpus(self):
+        return {"content": {"num_samples": 1}, "data": "new"}
+
+
+def test_an_export_replaces_the_file_only_once_fully_written(tmp_path, monkeypatch):
+    exporting: Any = _Exporting()
+    target = tmp_path / "corpus.json"
+    target.write_text("previous", encoding="utf-8")
+
+    def full_disk(self, *args, **kwargs):
+        raise OSError("No space left on device")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(Path, "write_text", full_disk)
+        with pytest.raises(OSError):
+            corpus.export_file(exporting, str(target))
+    assert target.read_text(encoding="utf-8") == "previous"
+    assert corpus.export_file(exporting, str(target)) == {"num_samples": 1}
+    assert json.loads(target.read_text(encoding="utf-8"))["data"] == "new"
+    assert [path.name for path in tmp_path.iterdir()] == ["corpus.json"]
 
 
 def test_importing_a_missing_file_says_which_file(monkeypatch, tmp_path):

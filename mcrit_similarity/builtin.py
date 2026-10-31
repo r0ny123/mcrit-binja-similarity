@@ -38,6 +38,8 @@ class Endpoint:
 
 _lock = threading.Lock()
 _endpoint: Endpoint | None = None
+# The corpus file that failed to load at start, which an export must not overwrite.
+unloaded_corpus = ""
 
 
 def is_builtin(server: str) -> bool:
@@ -57,14 +59,15 @@ def endpoint(corpus: str = "") -> Endpoint:
 
 
 def _load_corpus(started: Endpoint, path: str) -> None:
+    global unloaded_corpus
     from mcrit_similarity.corpus import import_file, import_summary
-    from mcrit_similarity.errors import McritError
     from mcrit_similarity.mcrit.client import McritClient
 
     try:
         report = import_file(McritClient(started.url, apitoken=started.token, timeout=None), path)
-    except (McritError, OSError) as exc:
-        # Matching still works against what sessions upload.
+    except Exception as exc:
+        # The server is already running; matching still works against what sessions upload.
+        unloaded_corpus = path
         log_error(f"The built-in MCRIT server could not load the corpus {path}: {exc}")
         return
     log_info(import_summary(report, path))
@@ -105,9 +108,6 @@ def _start() -> Endpoint:
     # identical results.
     McritConfig.MINHASH_CONFIG.MINHASH_POOL_INDEXING = False
     McritConfig.MINHASH_CONFIG.MINHASH_POOL_MATCHING = False
-    # Memory storage cannot feed vectorised scoring: every match would try it, log a warning and
-    # fall back to the same per-pair scoring.
-    McritConfig.MINHASH_CONFIG.MINHASH_MATCHING_VECTORIZED = False
 
     try:
         from mcrit.server.application_routes import get_app

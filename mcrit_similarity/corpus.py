@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,11 @@ def import_file(client: McritClient, path: str) -> dict[str, Any]:
 def export_file(client: McritClient, path: str) -> dict[str, Any]:
     """Write the server's whole corpus to ``path``; returns the export's content counts."""
     data = client.export_corpus()
-    Path(path).write_text(json.dumps(data), encoding="utf-8")
+    target = Path(path)
+    # Written aside first, so a failed write leaves the previous export intact.
+    partial = target.with_name(target.name + ".partial")
+    partial.write_text(json.dumps(data), encoding="utf-8")
+    os.replace(partial, target)
     content = data.get("content")
     return content if isinstance(content, dict) else {}
 

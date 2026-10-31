@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Callable
 
-from mcrit_similarity import corpus
+from mcrit_similarity import builtin, corpus
 from mcrit_similarity.builtin import is_builtin
 from mcrit_similarity.config import ProviderConfig
 from mcrit_similarity.connection import client_for, resolve
@@ -48,6 +49,12 @@ def export_corpus(config: ProviderConfig, path: str) -> tuple[bool, str]:
     return True, (
         f"Saved {corpus.count(content.get('num_samples', 0), 'sample')} "
         f"({corpus.count(content.get('num_functions', 0), 'function')}) to {path}"
+    )
+
+
+def _same_file(path: str, other: str) -> bool:
+    return bool(other) and os.path.abspath(os.path.expanduser(path)) == os.path.abspath(
+        os.path.expanduser(other)
     )
 
 
@@ -112,5 +119,15 @@ def run_corpus_export() -> None:
     if config is None:
         return
     path = get_save_filename_input("Save the built-in corpus as", "*.json", "mcrit-corpus.json")
+    if path and _same_file(path, builtin.unloaded_corpus):
+        from binaryninja import MessageBoxIcon, show_message_box
+
+        show_message_box(
+            _TITLE,
+            f"The built-in server could not load {path} when it started, so it holds only this "
+            "session's samples. Exporting there would replace that corpus; choose another file.",
+            icon=MessageBoxIcon.WarningIcon,
+        )
+        return
     if path:
         _in_background("mcrit-corpus-export", lambda: export_corpus(config, path))
