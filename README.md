@@ -16,6 +16,7 @@ Use [MCRIT](https://github.com/familiary/mcrit) code similarity in Binary Ninja'
 - **Or bring your corpus.** Point it at an MCRIT server or mcritweb, with your API token, to match against shared samples, labels and families.
 - **Side-by-side diffs.** Render any match in the Graph or Linear view, as disassembly, IL or pseudo-code. Changed lines are orange, removed red, added green.
 - **Apply.** Copy names, types, variables and comments from the matched function, and optionally name unnamed functions after their MCRIT label.
+- **Sessions that remember.** Save the built-in server's samples to a file and load them at the next start, so sessions skip uploading and indexing binaries they have seen.
 - **Confidence reflects ambiguity.** It drops when another candidate scores close to the best one.
 - **x86, x86_64 and aarch64** binaries.
 
@@ -102,10 +103,21 @@ A quick sanity check: functions that have the same name on both sides should mat
 
 This is the default. MCRIT starts inside Binary Ninja the first time it is needed, which takes several seconds. It gives the same results as a standalone MCRIT 1.16 server.
 
-- Samples live in memory until Binary Ninja exits, so each run indexes them again. Two binaries of a few thousand functions take seconds.
-- It only knows the binaries in your sessions. Matching against a shared corpus, with its labels and families, needs a server.
+- Samples live in memory until Binary Ninja exits. To keep them, save the corpus with **Export Built-in Corpus...** and name the file under the **Built-in corpus** setting, which loads it at every start.
+- It knows the binaries in your sessions and any export you load. A session finds a binary already there and does not upload or index it again. For a corpus shared with others, use a server.
 - It runs in one process, listens only on 127.0.0.1, and accepts only a token generated for each run.
 - Stopping a session takes effect once the sample being indexed or matched is done.
+
+### Saving the built-in corpus
+
+Under `Plugins > MCRIT Similarity`, or from the command palette:
+
+| Command | What it does |
+|---|---|
+| Export Built-in Corpus... | Saves the built-in server's samples to a JSON file. |
+| Import Corpus into Built-in Server... | Loads such a file, or one written by `mcrit client export` on any MCRIT server. Samples already present are skipped. |
+
+Both work on the built-in server only. To browse a corpus by family and sample, or to upload binaries with a family and version, use the [MCRIT plugin](https://github.com/familiary/mcrit-plugin) sidebar against an MCRIT server.
 
 ## Running an MCRIT server
 
@@ -132,6 +144,7 @@ Under Settings > **MCRIT Binary Similarity**:
 | Username | `username` header for mcritweb |
 | API token | Moved into the system keychain on first use, after which the field reads empty. Enter a new token to replace it |
 | Request timeout | Seconds per HTTP request |
+| Built-in corpus | An MCRIT export file loaded when the built-in server starts |
 
 Each session also has options under **Configuration**: MinHash threshold, PicHash size, LSH bands, maximum candidates, library matches, uploads (with an optional family and version), and two opt-ins:
 

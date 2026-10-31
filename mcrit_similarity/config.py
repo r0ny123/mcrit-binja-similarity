@@ -42,6 +42,7 @@ class ProviderConfig:
     query_per_node: bool = False
     family: str = ""
     version: str = ""
+    builtin_corpus: str = ""
 
 
 def _as_int(value: object, default: int, minimum: int, maximum: int) -> int:
@@ -97,4 +98,5 @@ def config_from_values(
         query_per_node=_as_bool(values.get("query_per_node"), base.query_per_node),
         family=_as_str(values.get("family"), base.family).strip(),
         version=_as_str(values.get("version"), base.version).strip(),
+        builtin_corpus=_as_str(values.get("builtin_corpus"), base.builtin_corpus).strip(),
     )

@@ -13,7 +13,7 @@ def resolve(config: ProviderConfig) -> ProviderConfig:
     """The configuration as used: the built-in server becomes its URL, starting it if needed."""
     if not builtin.is_builtin(config.server):
         return config
-    endpoint = builtin.endpoint()
+    endpoint = builtin.endpoint(config.builtin_corpus)
     # The built-in server holds nothing until samples are uploaded, and it runs every job inside
     # the request that submits it, so a request lasts as long as indexing or matching does.
     return replace(
