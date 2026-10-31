@@ -9,8 +9,12 @@ from mcrit_similarity import diskcache, export
 from mcrit_similarity.cache import REPORT_KEYS, REPORTS, LockedCache
 
 
-def _function(start):
-    return SimpleNamespace(start=start)
+def _function(start, arch="x86_64", blocks=()):
+    return SimpleNamespace(start=start, arch=arch, basic_blocks=list(blocks))
+
+
+def _block(start, end, arch):
+    return SimpleNamespace(start=start, end=end, arch=arch, has_invalid_instructions=False)
 
 
 def _fake_report():
@@ -105,6 +109,26 @@ def test_analysis_changed_tolerates_small_gaps_and_ignores_import_stubs(
     setattr(view, "get_sections_at", lambda address: [stub] if address < imports else [])
     report = SimpleNamespace(num_functions=stored)
     assert export._analysis_changed(report, view) is changed
+
+
+def test_analysis_changed_counts_only_the_functions_the_exporter_keeps():
+    # BN can hold an A32 and a T32 function over the same bytes, and two functions at one start;
+    # SMDA's exporter keeps one of each, so a fresh report must not look stale.
+    view = _View(b"arm", session_id=351)
+    kept = [
+        _function(
+            0x1000 + 0x100 * i, "armv7", [_block(0x1000 + 0x100 * i, 0x1080 + 0x100 * i, "armv7")]
+        )
+        for i in range(20)
+    ]
+    overlapping = [
+        _function(f.start + 2, "thumb2", [_block(f.start + 2, f.start + 0x40, "thumb2")])
+        for f in kept
+    ]
+    view.functions = kept + overlapping + [_function(0x1000, "armv7")]
+    setattr(view, "get_sections_at", lambda address: [])
+    setattr(view, "get_code_refs", lambda address: [])
+    assert export._analysis_changed(SimpleNamespace(num_functions=20), view) is False
 
 
 def test_stored_report_with_a_different_function_set_is_rebuilt(folder, monkeypatch):

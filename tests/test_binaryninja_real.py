@@ -19,7 +19,12 @@ ultimate = pytest.mark.skipif(
 
 
 def _function(view, name):
-    (symbol,) = view.get_symbols_by_name(name)
+    # Mach-O prefixes C symbols with an underscore; ELF does not, and adds a PLT stub per export.
+    (symbol,) = (
+        symbol
+        for symbol in view.get_symbols_by_name(name) or view.get_symbols_by_name(name.lstrip("_"))
+        if symbol.type == bn.SymbolType.FunctionSymbol
+    )
     function = view.get_function_at(symbol.address)
     assert function is not None, name
     return function

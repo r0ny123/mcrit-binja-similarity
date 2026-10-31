@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{ name = "Rony" }]
 dependencies = [
-    "smda==5.0.1",
+    "smda==5.0.2",
     "requests",
     "mcrit==1.16.0",
 ]

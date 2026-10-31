@@ -177,7 +177,7 @@ def test_a_pichash_pair_is_always_fully_similar():
 @PROPERTY
 def test_only_the_exporter_architectures_are_accepted(name):
     if name in SMDA_ARCHITECTURES:
-        assert smda_architecture(name) in {"intel", "aarch64"}
+        assert smda_architecture(name) in {"intel", "aarch64", "arm"}
     else:
         with pytest.raises(UnsupportedArchitectureError, match="Unsupported architecture"):
             smda_architecture(name)

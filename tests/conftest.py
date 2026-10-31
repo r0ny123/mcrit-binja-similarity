@@ -468,7 +468,7 @@ def analysed_views(*names: str):
         yield tuple(opened)
 
 
-@pytest.fixture(scope="module", params=["x86_64", "arm64"])
+@pytest.fixture(scope="module", params=["x86_64", "arm64", "armv7", "thumb2"])
 def views(request):
     """The -O2 and -Os builds of the same zlib sources for one architecture."""
     with analysed_views(f"zlib-{request.param}-O2", f"zlib-{request.param}-Os") as opened:

@@ -9,6 +9,7 @@ every test that mutates a server otherwise launches one of its own and stops it 
 from __future__ import annotations
 
 import gc
+import re
 import runpy
 import socket
 import sys
@@ -32,7 +33,7 @@ if not hasattr(bn, "SimilaritySession"):
 
 # Symbols every fixture build exports, big enough to stay above the default MinHash threshold
 # between -O2 and -Os. _adler32 and _crc32 are there too, but their two builds score below it.
-KNOWN_FUNCTIONS = ("_deflate", "_inflate")
+KNOWN_FUNCTIONS = ("deflate", "inflate")
 # The two builds differ only in optimisation level, so a large majority of functions must match.
 MIN_RESULTS = 20
 SESSION_TIMEOUT = 600
@@ -139,21 +140,24 @@ def _results(node) -> list[tuple[Any, Any, Any]]:
 def _entity_name(node, entity_id) -> str:
     info = node.get_entity(entity_id)
     if info is not None and info.name:
-        return str(info.name)
+        return _c_name(str(info.name))
     function = node.get_entity_function(entity_id)
-    return function.name if function is not None else ""
+    return _c_name(function.name) if function is not None else ""
+
+
+def _c_name(symbol: str) -> str:
+    # Mach-O prefixes C symbols with an underscore; ELF does not.
+    return symbol.removeprefix("_")
 
 
 def _instruction_ranges(function) -> set[tuple[int, int]]:
-    view = function.view
     ranges: set[tuple[int, int]] = set()
     for block in function.basic_blocks:
         ranges.add((block.start, block.end))
         address = block.start
-        while address < block.end:
-            length = view.get_instruction_length(address, block.arch)
-            if not length:
-                break
+        # The lines a block shows, not get_instruction_length: that spans a Thumb-2 IT block and
+        # the instructions it predicates, which Binary Ninja shows as separate lines.
+        for _tokens, length in block:
             ranges.add((address, address + length))
             address += length
     return ranges
@@ -172,7 +176,7 @@ class Matched:
     arch: str
 
 
-@pytest.fixture(scope="module", params=["x86_64", "arm64"])
+@pytest.fixture(scope="module", params=["x86_64", "arm64", "armv7", "thumb2"])
 def matched(request, mcrit_server):
     """One finished O2 -> Os session per architecture, against a freshly reset server."""
     arch = request.param
@@ -255,7 +259,7 @@ def test_render_paints_both_sides_of_a_matched_pair(matched):
     entity_id, result_id, result = next(
         (entity, result_id, result)
         for entity, result_id, result in _results(matched.target_node)
-        if _entity_name(matched.target_node, entity) == "_deflate"
+        if _entity_name(matched.target_node, entity) == "deflate"
     )
     source = matched.target_node.get_entity_function(entity_id)
     target = matched.reference_node.get_entity_function(result.target.entity_id)
@@ -564,7 +568,7 @@ def test_the_headless_example_runs_against_the_server(matched, monkeypatch, caps
     finally:
         settings.set_string("mcrit_similarity.server", previous)
     lines = capsys.readouterr().out.splitlines()
-    assert any(line.startswith("_deflate -> _deflate:") for line in lines), lines[-5:]
+    assert any(re.match(r"_?deflate -> _?deflate:", line) for line in lines), lines[-5:]
 
 
 def test_the_builtin_server_matches_with_nothing_to_set_up(x86_views):

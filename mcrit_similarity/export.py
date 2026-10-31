@@ -155,13 +155,13 @@ def _analysis_changed(report, bv) -> bool:
     """Whether functions were added or removed since the report was stored.
 
     Binary Ninja's function count for the same bytes varies by a few between processes, so only a
-    larger gap counts, such as functions defined by hand in a database. Import stubs are left out
-    of the count because the exporter skips them.
+    larger gap counts, such as functions defined by hand in a database. The count is of the
+    functions the exporter keeps: no import stubs, and one per start and per ARM/Thumb overlap.
     """
     from smda.binja.BinjaInterface import BinjaInterface
 
     interface = BinjaInterface(bv)
-    count = sum(1 for function in bv.functions if not interface.isExternalFunction(function.start))
+    count = sum(1 for start in interface.getFunctions() if not interface.isExternalFunction(start))
     return abs(count - report.num_functions) > max(8, count // 50)
 
 
