@@ -219,18 +219,6 @@ class McritClient:
             )
         return data
 
-    def query_function(
-        self,
-        smda_report: dict[str, Any],
-        minhash_threshold: int | None = None,
-        pichash_size: int | None = None,
-        band_matches_required: int | None = None,
-    ) -> Any:
-        """Match a report holding exactly one function against the corpus, storing nothing."""
-        params = _matching_params(minhash_threshold, pichash_size, band_matches_required, False)
-        params["exclude_self_matches"] = "true"
-        return self._request("POST", "query/function", params=params, json=smda_report)
-
     def get_functions_by_ids(self, function_ids: list[int]) -> dict[int, dict[str, Any]]:
         """Function entries without xcfg. The body is comma-separated ids, as MCRIT expects."""
         mapped: dict[int, dict[str, Any]] = {}

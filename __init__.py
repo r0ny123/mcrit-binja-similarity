@@ -38,16 +38,6 @@ def _register() -> None:
         "Save the built-in server's corpus as an MCRIT export file",
         commands.run_corpus_export,
     )
-    PluginCommand.register(
-        commands.ADD_COMMAND,
-        "Upload this binary to the MCRIT corpus with a family and version",
-        commands.run_add_binary,
-    )
-    PluginCommand.register_for_function(
-        commands.MATCHES_COMMAND,
-        "Match this function against the whole MCRIT corpus",
-        commands.run_corpus_matches,
-    )
     log_info("Registered MCRIT Binary Similarity provider")
 
 

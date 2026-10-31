@@ -190,10 +190,7 @@ elif "binaryninja" not in sys.modules:
         PluginCommand=type(
             "PluginCommand",
             (),
-            {
-                name: staticmethod(lambda *args: None)
-                for name in ("register", "register_global", "register_for_function")
-            },
+            {name: staticmethod(lambda *args: None) for name in ("register", "register_global")},
         ),
         log=bn_log,
         similarity=bn_sim,
