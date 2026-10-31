@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
 ### Added
 
 - Support for 32-bit ARM binaries (ARM and Thumb-2, little-endian), with `smda` 5.0.2.
 - **Export Built-in Corpus...** and **Import Corpus into Built-in Server...** save the built-in server's samples to a file and load one, including exports from any MCRIT server. Sessions then find binaries already indexed and skip uploading them again.
 - The **Built-in corpus** setting names an export file to load whenever the built-in server starts.
+
+### Changed
+
+- Release archives hold only the plugin, its README, changelog, license and the headless example; tests, CI and screenshots stay in the repository.
 
 ## [0.2.0] - 2026-10-29
 
@@ -47,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A token is only sent over HTTPS, or HTTP to a loopback address; redirects and credentials in the server URL are refused.
 - The built-in server listens only on 127.0.0.1 and accepts only requests carrying a token generated for each Binary Ninja run.
 
-[Unreleased]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/r0ny123/mcrit-binja-similarity/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/r0ny123/mcrit-binja-similarity/releases/tag/v0.1.0
