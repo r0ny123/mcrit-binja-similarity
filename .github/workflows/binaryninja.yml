@@ -141,7 +141,7 @@ jobs:
       # runner empties at the start and end of every job. Nothing is cached or uploaded.
       - name: Set up Binary Ninja (serial)
         if: steps.config.outputs.method == 'serial'
-        uses: Vector35/setup-binary-ninja@c1414a20628fc677da240f19c366f3c8b06d1d68 # main, 2026-02-24 (node20)
+        uses: Vector35/setup-binary-ninja@1db3cd42c398a8c15ef4ab5ffa91ca0cea0c2d07 # main, 2026-02-24 (node20)
         with:
           license: ${{ secrets.BN_SERIAL }}
           dev-branch: ${{ matrix.channel == 'dev' }}
